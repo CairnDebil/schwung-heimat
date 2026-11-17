@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify version match
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          for f in src/module.json src/solo/module.json; do
+            V=$(jq -r '.version' "$f")
+            if [ "$V" != "$VERSION" ]; then
+              echo "ERROR: tag $VERSION does not match $f version $V"; exit 1
+            fi
+          done
+          echo "Version check passed: $VERSION"
+
+      - name: Offline tests
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq gcc >/dev/null
+          bash ./scripts/test.sh
+          SAN=1 bash ./scripts/test.sh
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build with Docker
+        run: |
+          docker build -t module-builder -f scripts/Dockerfile .
+          docker run --rm -v "$PWD:/build" -w /build module-builder bash ./scripts/build.sh
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on && /^\[[0-9.]+\]: / { next }
+            on { print }
+          ' CHANGELOG.md > release_notes.md
+          if [ ! -s release_notes.md ]; then echo "CHANGELOG.md has no section for $VERSION"; exit 1; fi
+          printf '\n---\nInstall: download both .tar.gz files and add them in Schwung Manager (Modules, custom module), then restart the Move.\n' >> release_notes.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: release_notes.md
+          prerelease: ${{ startsWith(github.ref_name, 'v0.') || contains(github.ref_name, '-') }}
+          files: |
+            dist/heimat-module.tar.gz
+            dist/heimat-solo-module.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit release.json
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          BASE="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}"
+          REPO="https://github.com/${{ github.repository }}"
+          git fetch origin main
+          git checkout -f main
+          jq --arg v "$VERSION" --arg b "$BASE" --arg r "$REPO" '
+            .version = $v | .download_url = ($b + "/heimat-module.tar.gz") | .repo_url = $r
+            | .modules.heimat.version = $v | .modules.heimat.download_url = ($b + "/heimat-module.tar.gz") | .modules.heimat.repo_url = $r
+            | .modules["heimat-solo"].version = $v | .modules["heimat-solo"].download_url = ($b + "/heimat-solo-module.tar.gz") | .modules["heimat-solo"].repo_url = $r
+          ' release.json > release.json.new && mv release.json.new release.json
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add release.json
+          git commit -m "chore: update release.json for ${{ github.ref_name }}" || echo "No changes to commit"
+          git push origin main

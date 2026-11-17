@@ -1,0 +1,46 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc gcc-aarch64-linux-gnu python3 python3-pil >/dev/null
+          npm install --no-save --no-package-lock playwright@1.48.2
+          npx playwright install --with-deps chromium
+
+      - name: Tests (DSP, Solo UI, browser editor, generated files)
+        run: SCREENS=1 bash scripts/test.sh
+
+      - name: Tests with AddressSanitizer and UBSan
+        run: SAN=1 bash scripts/test.sh
+
+      - name: Screenshots and generated files are committed
+        run: |
+          git status --porcelain docs src
+          if [ -n "$(git status --porcelain src docs/index.html docs/editor.html)" ]; then
+            echo "Run 'python3 scripts/gen_web.py' and commit the result."; exit 1
+          fi
+
+      - name: ARM64 build for the Move
+        run: CROSS_PREFIX=aarch64-linux-gnu- bash scripts/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: heimat-modules
+          path: |
+            dist/heimat-module.tar.gz
+            dist/heimat-solo-module.tar.gz

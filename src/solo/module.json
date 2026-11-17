@@ -1,0 +1,21 @@
+{
+  "id": "heimat-solo",
+  "name": "Heimat Solo",
+  "abbrev": "HMT",
+  "version": "0.7.0",
+  "min_host_version": "1.7.3",
+  "description": "Standalone tape and microsound instrument: record, splice by hand, granulate with envelopes, scatter and spread, clock sync and reel saving",
+  "author": "TUO NOME",
+  "license": "MIT",
+  "component_type": "overtake",
+  "ui": "ui.js",
+  "dsp": "dsp.so",
+  "api_version": 2,
+  "capabilities": {
+    "audio_in": true,
+    "audio_out": true,
+    "midi_in": true,
+    "aftertouch": false,
+    "component_type": "overtake"
+  }
+}

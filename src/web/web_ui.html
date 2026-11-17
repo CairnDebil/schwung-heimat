@@ -1,0 +1,1382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heimat editor</title>
+<meta name="description" content="Browser editor for Heimat, the tape and microsound instrument for Schwung on Ableton Move.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Monoton&family=Syne:wght@500;600;700;800&family=Courier+Prime:wght@400;700&family=Permanent+Marker&display=swap" rel="stylesheet">
+<style>
+/* Heimat editor — a panel, with notes taped on it.
+   The browser page is the instrument's faceplate: black anodised aluminium,
+   cream silkscreen, fine line drawing. The fanzine part is what a player
+   sticks on an instrument: typed slips of paper and bits of tape.
+   The tape reel, seen from above, is a spiral: Heimat's sign, and the only
+   psychedelic image the page needs.
+   One meaning per colour:
+     cream silkscreen  structure, and what is chosen (printed solid)
+     acid chartreuse   what is alive: genes, values, levels
+     magenta           cuts and recording
+   The magenta-orange-chartreuse gradient appears once: on the spiral.     */
+:root {
+  --panel: #101010;
+  --window: #060606;
+  --silk: #efe6d2;
+  --silk-2: #bdb4a2;
+  --silk-3: #847d70;
+  --hair: rgba(239, 230, 210, .28);
+  --acid: #d4ff3a;
+  --mag: #ff3d9a;
+  --paper: #ebe3cf;
+  --paper-ink: #1b1813;
+  --paper-mag: #b80f62;
+  --tape: rgba(226, 210, 165, .72);
+  --mark: "Monoton", "Bungee Hairline", "Arial Black", sans-serif;
+  --label: "Syne", "Avenir Next", "Futura", "Century Gothic", sans-serif;
+  --type: "Courier Prime", "Courier New", Courier, monospace;
+  --hand: "Permanent Marker", "Marker Felt", cursive;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  /* anodised black: a faint horizontal brushing */
+  background: var(--panel) repeating-linear-gradient(0deg, rgba(255, 255, 255, .012) 0 1px, transparent 1px 3px);
+  color: var(--silk);
+  font: 400 15px/1.45 var(--label);
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1240px; margin: 0 auto; padding: 18px 18px 30px; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--acid); outline-offset: 2px; }
+
+/* --------------------------------------------------------------- header */
+.bar { display: flex; align-items: center; gap: 14px 22px; flex-wrap: wrap; margin-bottom: 16px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.spiral { width: 54px; height: 54px; flex: none; }
+.spiral svg { width: 100%; height: 100%; display: block; animation: reel 18s linear infinite; }
+@keyframes reel { to { transform: rotate(360deg); } }
+.title { margin: 0; font: 400 46px/0.9 var(--mark); letter-spacing: .02em; color: var(--silk); }
+.title small { display: block; font: 600 11px/1.2 var(--label); letter-spacing: .24em; text-transform: uppercase; color: var(--silk-3); margin-top: 6px; }
+/* the state: a LED and its silkscreen label */
+.where { display: flex; align-items: center; gap: 8px; font: 600 12px/1.2 var(--label); letter-spacing: .14em; text-transform: uppercase; color: var(--silk-2); }
+.where .dot { width: 10px; height: 10px; border-radius: 50%; background: #2a2a2a; box-shadow: inset 0 0 0 1px var(--silk-3); flex: none; }
+.where[data-state="live"] .dot { background: var(--acid); box-shadow: 0 0 10px var(--acid); }
+.where[data-state="demo"] .dot { background: var(--mag); box-shadow: 0 0 10px var(--mag); }
+.spacer { flex: 1; }
+.transport { display: flex; gap: 6px; flex-wrap: wrap; }
+.tbtn {
+  display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px;
+  border: 1.5px solid var(--silk); border-radius: 17px; background: transparent; cursor: pointer;
+  font: 600 12px/1 var(--label); letter-spacing: .14em; text-transform: uppercase;
+}
+.tbtn:hover { background: rgba(239, 230, 210, .1); }
+.tbtn svg { width: 12px; height: 12px; }
+.tbtn[aria-pressed="true"] { background: var(--silk); color: var(--panel); }
+.tbtn.rec svg { color: var(--mag); }
+.tbtn.rec[aria-pressed="true"] { background: var(--mag); border-color: var(--mag); color: #fff; }
+.tbtn.rec[aria-pressed="true"] svg { color: #fff; }
+.tbtn.armed { border-color: var(--mag); color: var(--mag); animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .4; } }
+/* levels: a row of LEDs */
+.meters { display: grid; gap: 6px; width: 128px; }
+.meter { display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 6px; font: 600 10px/1 var(--label); letter-spacing: .16em; text-transform: uppercase; color: var(--silk-3); }
+.meter i {
+  display: block; height: 7px; position: relative;
+  background: radial-gradient(circle, #262626 2.6px, transparent 3px) 0 50% / 10px 7px repeat-x;
+}
+.meter b {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+  background: radial-gradient(circle, var(--acid) 2.6px, transparent 3px) 0 50% / 10px 7px repeat-x;
+  filter: drop-shadow(0 0 3px rgba(212, 255, 58, .6));
+}
+
+/* --------------------------------------------------------- the tape window */
+.reel {
+  background: var(--window); padding: 12px 12px 8px; position: relative;
+  border: 1.5px solid var(--silk); border-radius: 14px;
+}
+.reel canvas { display: block; width: 100%; height: 176px; cursor: crosshair; touch-action: none; }
+.reel .empty {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px;
+  color: var(--silk-2); font: 400 15px/1.5 var(--type); pointer-events: none;
+}
+.reel .hint { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 6px; color: var(--silk-3); font: 500 12px/1.35 var(--label); letter-spacing: .04em; }
+/* the readings: a typed slip taped under the window */
+.readouts {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 14px 26px 26px; position: relative;
+  background: var(--paper); color: var(--paper-ink); transform: rotate(-.4deg); box-shadow: 0 2px 0 rgba(0, 0, 0, .5);
+}
+.readouts::before, .readouts::after { content: ""; position: absolute; top: -10px; width: 70px; height: 20px; background: var(--tape); }
+.readouts::before { left: 8%; transform: rotate(-5deg); }
+.readouts::after { right: 9%; transform: rotate(4deg); }
+.ro { padding: 9px 12px 10px; min-width: 0; border-left: 1px dashed rgba(27, 24, 19, .45); }
+.ro:first-child { border-left: 0; }
+.ro .k { color: #4a443a; font: 400 12.5px/1.1 var(--type); }
+.ro .v { font: 700 22px/1.2 var(--type); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ro .t { font: 400 15px/1 var(--hand); color: var(--paper-mag); margin-left: 6px; letter-spacing: .02em; }
+
+/* ---------------------------------------------------------------- panels */
+/* the faceplate is divided by silkscreen hairlines; each region is a group */
+.grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 0; border-top: 1.5px solid var(--silk); }
+.panel { position: relative; padding: 18px 18px 20px; min-width: 0; border-bottom: 1px solid var(--hair); border-right: 1px solid var(--hair); }
+.panel h2 {
+  margin: 0 0 14px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  font: 700 13px/1 var(--label); letter-spacing: .26em; text-transform: uppercase; color: var(--silk);
+}
+.panel h2 .dymo::before { content: ""; display: inline-block; width: 9px; height: 9px; border: 1.5px solid var(--silk); border-radius: 50%; margin-right: 9px; vertical-align: 0; }
+.panel h2 small { font: 500 12px/1 var(--label); letter-spacing: .06em; text-transform: none; color: var(--silk-3); }
+#morphStage { color: var(--acid); }
+.span-4 { grid-column: span 4; } .span-5 { grid-column: span 5; } .span-6 { grid-column: span 6; }
+.span-7 { grid-column: span 7; } .span-8 { grid-column: span 8; } .span-12 { grid-column: span 12; }
+.scope { width: 100%; height: 100px; display: block; background: var(--window); border: 1px solid var(--hair); border-radius: 10px; margin-bottom: 12px; }
+.scope.tall { height: 134px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px 6px; align-items: flex-start; }
+.row + .row { margin-top: 8px; }
+.row.gap { margin-top: 14px; }
+.row.knobs { gap: 8px 2px; }
+.fxcols { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 0; }
+.fxcols > div { min-width: 0; padding: 0 16px; }
+.fxcols > div:first-child { padding-left: 0; }
+.fxcols > div:last-child { padding-right: 0; }
+.fxcols > div + div { border-left: 1px solid var(--hair); }
+.fxcols .knob { width: 70px; }
+.headscols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 0; }
+.headscols > div { min-width: 0; padding: 0 16px; }
+.headscols > div:first-child { padding-left: 0; }
+.headscols > div:last-child { padding-right: 0; border-left: 1px solid var(--hair); }
+[hidden] { display: none !important; }
+.solo-only[data-off] { opacity: .35; pointer-events: none; }
+
+/* knob: a black cap with a cream pointer, a silkscreened scale of ticks,
+   the value as an acid arc outside the scale */
+.knob { width: 80px; display: grid; justify-items: center; gap: 3px; user-select: none; -webkit-user-select: none; }
+.knob .dial { width: 64px; height: 64px; cursor: ns-resize; touch-action: none; border-radius: 50%; }
+.knob svg { width: 64px; height: 64px; display: block; overflow: visible; }
+.knob .tick { stroke: var(--silk-2); stroke-width: 1.3; }
+.knob .trk { fill: none; stroke: #262626; stroke-width: 3; }
+.knob .val { fill: none; stroke: var(--acid); stroke-width: 3; stroke-linecap: round; filter: drop-shadow(0 0 3px rgba(212, 255, 58, .45)); }
+.knob .cap { fill: #050505; stroke: var(--silk); stroke-width: 1.5; }
+.knob .ptr { stroke: var(--silk); stroke-width: 2.6; stroke-linecap: round; }
+.knob .lbl { font: 700 10.5px/1.2 var(--label); letter-spacing: .16em; text-transform: uppercase; color: var(--silk-2); text-align: center; }
+.knob .num { font: 600 14px/1.15 var(--label); text-align: center; white-space: nowrap; color: var(--acid); font-variant-numeric: tabular-nums; }
+.knob.disabled .val { stroke: var(--silk-3); filter: none; }
+.knob.disabled .num { color: var(--silk-3); }
+
+/* choices: a row of outlined words; the chosen one is printed solid */
+.seg { display: grid; gap: 5px; min-width: 0; }
+.seg .lbl, .step .lbl { font: 700 10.5px/1.2 var(--label); letter-spacing: .16em; text-transform: uppercase; color: var(--silk-2); }
+.seg .opts { justify-self: start; display: inline-flex; flex-wrap: wrap; border: 1.5px solid var(--silk); border-radius: 15px; overflow: hidden; }
+.seg button {
+  border: 0; background: transparent; padding: 5px 11px; cursor: pointer; font: 600 13px/1.2 var(--label);
+  color: var(--silk); border-right: 1px solid var(--hair);
+}
+.seg button:last-child { border-right: 0; }
+.seg button[aria-checked="true"] { background: var(--silk); color: var(--panel); }
+.seg button:hover:not([aria-checked="true"]) { background: rgba(239, 230, 210, .1); }
+.seg.dense button { padding: 5px 7px; font-size: 12px; }
+
+/* stepper */
+.step { display: grid; gap: 5px; }
+.step .box { display: inline-grid; grid-template-columns: 30px minmax(58px, auto) 30px; align-items: center; border: 1.5px solid var(--silk); border-radius: 15px; overflow: hidden; }
+.step button { height: 28px; border: 0; background: transparent; cursor: pointer; font: 600 17px/1 var(--label); color: var(--silk); }
+.step button:hover { background: rgba(239, 230, 210, .1); }
+.step output { text-align: center; font: 600 14px/1 var(--label); color: var(--acid); }
+
+/* envelope picker */
+.envs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin-bottom: 14px; }
+.envs button {
+  border: 1px solid var(--hair); border-radius: 10px; background: var(--window); padding: 7px 2px 6px; cursor: pointer;
+  display: grid; justify-items: center; gap: 3px; font: 700 9.5px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--silk-2); min-width: 0;
+}
+.envs svg { width: 100%; max-width: 46px; height: 22px; }
+.envs path { fill: none; stroke: currentColor; stroke-width: 1.6; }
+.envs button:hover { border-color: var(--silk-2); }
+.envs button[aria-checked="true"] { border-color: var(--acid); color: var(--silk); }
+.envs button[aria-checked="true"] path { stroke: var(--acid); }
+
+.actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 16px; }
+.abtn { height: 30px; padding: 0 12px; border: 1.5px solid var(--silk); border-radius: 15px; background: transparent; cursor: pointer; font: 600 11px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--silk); }
+.abtn:hover { background: rgba(239, 230, 210, .1); }
+.abtn.warn { border-color: var(--mag); color: var(--mag); }
+.abtn.warn[data-confirm] { background: var(--mag); color: #fff; }
+
+/* notes taped on the panel */
+.note, .chainnote {
+  background: var(--paper); color: var(--paper-ink); font: 400 13.5px/1.5 var(--type); padding: 12px 16px; position: relative;
+  max-width: 70ch; transform: rotate(-.6deg); box-shadow: 0 2px 0 rgba(0, 0, 0, .5);
+}
+.note { margin: 26px 0 0; }
+.note::before, .chainnote::before { content: ""; position: absolute; top: -9px; left: 24px; width: 74px; height: 18px; background: var(--tape); transform: rotate(-4deg); }
+.chainnote { margin: 4px 0 26px; transform: rotate(.5deg); }
+
+.toast {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%) translateY(16px) rotate(-2deg); opacity: 0;
+  background: var(--paper); color: var(--paper-ink); font: 700 15px/1 var(--type); padding: 11px 16px; box-shadow: 0 3px 0 rgba(0, 0, 0, .6);
+  transition: opacity .15s, transform .15s; pointer-events: none;
+}
+.toast.on { opacity: 1; transform: translateX(-50%) translateY(0) rotate(-2deg); }
+
+@media (max-width: 1080px) {
+  .span-4, .span-5 { grid-column: span 6; } .span-7, .span-8 { grid-column: span 12; }
+}
+@media (max-width: 760px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .span-4, .span-5, .span-6, .span-7, .span-8, .span-12 { grid-column: auto; }
+  .panel { border-right: 0; padding-left: 4px; padding-right: 4px; }
+  .fxcols { grid-template-columns: minmax(0, 1fr); }
+  .fxcols > div { padding: 0; }
+  .fxcols > div + div { border-left: 0; border-top: 1px solid var(--hair); padding-top: 16px; margin-top: 16px; }
+  .headscols { grid-template-columns: minmax(0, 1fr); }
+  .headscols > div { padding: 0; }
+  .headscols > div:last-child { border-left: 0; border-top: 1px solid var(--hair); padding-top: 16px; margin-top: 16px; }
+  .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 14px 6px 26px; }
+  .ro:nth-child(odd) { border-left: 0; }
+  .ro:nth-child(n+3) { border-top: 1px dashed rgba(27, 24, 19, .45); }
+  .ro:last-child { grid-column: span 2; }
+  .envs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .reel canvas { height: 140px; }
+  .meters { display: none; }
+  .title { font-size: 38px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tbtn.armed, .spiral svg { animation: none; }
+  .toast { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="bar">
+    <div class="brand">
+      <div class="spiral" aria-hidden="true"><svg id="spiralSvg" viewBox="-50 -50 100 100"></svg></div>
+      <h1 class="title" aria-label="Heimat">HEIMAT<small aria-hidden="true">tape and microsound</small></h1>
+    </div>
+    <div class="where" id="where" data-state="wait"><span class="dot"></span><span id="whereTxt">Connecting</span></div>
+    <div class="spacer"></div>
+    <div class="transport" id="transport">
+      <button class="tbtn" id="bPlay" aria-pressed="false" title="Play gate on / off">
+        <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z" fill="currentColor"/></svg>Play</button>
+      <button class="tbtn rec" id="bRec" aria-pressed="false" title="Record over the current splice; again to stop">
+        <svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5.5" fill="currentColor"/></svg>Record</button>
+      <button class="tbtn rec" id="bRecNew" aria-pressed="false" title="Record into a new splice at the end of the reel">
+        <svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="6" cy="7" r="4.5" fill="currentColor"/><path d="M11.5 4v6M8.5 7h6" stroke="currentColor" stroke-width="1.6"/></svg>New splice</button>
+      <button class="tbtn" id="bUndo" title="Undo the last marker edit or new-splice recording">Undo</button>
+      <button class="tbtn" id="bSave" title="Save the reel to UserLibrary/Samples/Heimat">Save reel</button>
+    </div>
+    <div class="meters" aria-hidden="true">
+      <div class="meter">In<i><b id="mIn"></b></i></div>
+      <div class="meter">Out<i><b id="mOut"></b></i></div>
+    </div>
+  </header>
+
+  <p class="chainnote" id="chainNote" hidden>Heimat in a track slot. Every control follows the Move as you turn it, and the Move follows the browser. The reel, the markers and recording are in Heimat Solo.</p>
+  <section class="reel" id="reelBox" aria-label="Reel">
+    <canvas id="reel" aria-label="Reel waveform with splice markers and the genes playing"></canvas>
+    <div class="empty" id="reelEmpty" hidden></div>
+    <div class="hint"><span id="hintL">Click a splice to select it. Drag a marker to move it, double-click to add or remove one.</span><span id="hintR"></span></div>
+  </section>
+
+  <div class="readouts" id="readouts" aria-live="off">
+    <div class="ro"><div class="k">Splice</div><div class="v" id="roSplice">–</div></div>
+    <div class="ro"><div class="k">Length</div><div class="v" id="roLen">–</div></div>
+    <div class="ro"><div class="k">Gene</div><div class="v" id="roGene">–</div></div>
+    <div class="ro"><div class="k">Density</div><div class="v" id="roDens">–</div></div>
+    <div class="ro"><div class="k">Fill factor</div><div class="v" id="roFill">–</div></div>
+  </div>
+
+  <main class="grid">
+    <section class="panel span-7" aria-labelledby="hGenes">
+      <h2 id="hGenes"><span class="dymo">Genes</span> <small id="morphStage"></small></h2>
+      <canvas class="scope" id="train" aria-label="Genes over time: length, overlap and gaps"></canvas>
+      <div class="row" id="gGenes"></div>
+    </section>
+
+    <section class="panel span-5" aria-labelledby="hMicro">
+      <h2 id="hMicro"><span class="dymo">Micro</span></h2>
+      <div class="envs" id="envs" role="radiogroup" aria-label="Gene envelope"></div>
+      <div class="row" id="gMicro"></div>
+    </section>
+
+    <section class="panel span-12" aria-labelledby="hFx">
+      <h2 id="hFx"><span class="dymo">Effects</span> <small>EQ, then delay, then reverb</small></h2>
+      <div class="fxcols">
+        <div>
+          <canvas class="scope tall" id="eq" aria-label="EQ curve. Drag the three points to shape it."></canvas>
+          <div class="row" id="gEq"></div>
+        </div>
+        <div>
+          <canvas class="scope tall" id="dly" aria-label="Delay echoes"></canvas>
+          <div class="row" id="gDly"></div>
+        </div>
+        <div>
+          <canvas class="scope tall" id="rev" aria-label="Reverb decay"></canvas>
+          <div class="row" id="gRev"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel span-12" aria-labelledby="hHeads">
+      <h2 id="hHeads"><span class="dymo">Heads</span> <small id="headsState">a loop of tape with several playback heads</small></h2>
+      <div class="headscols">
+        <div>
+          <canvas class="scope tall" id="headsCv" aria-label="Where each head reads on the tape, left and right"></canvas>
+          <div class="row" id="gHeads"></div>
+        </div>
+        <div>
+          <div class="row" id="gHeadsB"></div>
+          <div class="actions">
+            <button class="abtn warn" id="aHdClear" title="Silence everything on the heads at once">Clear heads</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel span-6" aria-labelledby="hPlay">
+      <h2 id="hPlay"><span class="dymo">Play</span></h2>
+      <div class="row" id="gPlay"></div>
+    </section>
+
+    <section class="panel span-6" aria-labelledby="hSplices">
+      <h2 id="hSplices"><span class="dymo">Splices and chords</span></h2>
+      <div class="row" id="gSplices"></div>
+      <div class="actions solo-only">
+        <button class="abtn" id="aDetect" title="Place markers on the transients of the reel">Auto-splice</button>
+        <button class="abtn" id="aDivide" title="Replace the markers with equal divisions">Divide now</button>
+        <button class="abtn warn" id="aClear" title="Remove every marker">Clear markers</button>
+      </div>
+    </section>
+
+    <section class="panel span-6 solo-only" aria-labelledby="hRec">
+      <h2 id="hRec"><span class="dymo">Recording</span> <small>Heimat Solo</small></h2>
+      <div class="row" id="gRec"></div>
+    </section>
+
+    <section class="panel span-6" aria-labelledby="hClock">
+      <h2 id="hClock"><span class="dymo">Clock</span></h2>
+      <div class="row" id="gClock"></div>
+    </section>
+  </main>
+  <p class="note" id="foot"></p>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script id="heimat-params" type="application/json">
+[{"key":"gene_size","name":"Gene-Size","short":"Gene","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.005,"group":"Genes"},{"key":"slide","name":"Slide","short":"Slide","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.005,"group":"Genes"},{"key":"morph","name":"Morph","short":"Morph","type":"float","min":0.0,"max":1.0,"default":0.18,"step":0.005,"group":"Genes"},{"key":"vari_speed","name":"Vari-Speed","short":"Speed","type":"float","min":-1.0,"max":1.0,"default":0.5,"step":0.005,"group":"Genes"},{"key":"organize","name":"Organize","short":"Org","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.005,"group":"Genes"},{"key":"volume","name":"Volume","short":"Vol","type":"float","min":0.0,"max":1.0,"default":0.8,"step":0.01,"group":"Play"},{"key":"pad_mode","name":"Pad Mode","short":"Pads","type":"enum","options":["Pitch","Splice","Drone"],"min":0,"max":2,"default":0.0,"step":1,"group":"Play"},{"key":"play_mode","name":"Play Gate","short":"Play","type":"enum","options":["Classic","Momentary","Trigger Loop"],"min":0,"max":2,"default":1.0,"step":1,"group":"Play"},{"key":"release_ms","name":"Release (ms)","short":"Rel","type":"float","min":1.0,"max":2000.0,"default":15.0,"step":1.0,"group":"Play"},{"key":"root_note","name":"Root Note","short":"Root","type":"int","min":0.0,"max":127.0,"default":60.0,"step":1,"group":"Play"},{"key":"octave_transpose","name":"Octave","short":"Oct","type":"int","min":-3.0,"max":3.0,"default":0.0,"step":1,"group":"Play"},{"key":"bend_range","name":"Bend Range","short":"Bend","type":"int","min":0.0,"max":12.0,"default":2.0,"step":1,"group":"Play"},{"key":"splice_base","name":"Splice Pad Base","short":"Base","type":"int","min":0.0,"max":120.0,"default":36.0,"step":1,"group":"Splices and chords"},{"key":"splice_source","name":"Splice Source","short":"SplSrc","type":"enum","options":["Markers","Divide"],"min":0,"max":1,"default":0.0,"step":1,"group":"Splices and chords"},{"key":"divide","name":"Divide Into","short":"Divide","type":"int","min":1.0,"max":32.0,"default":8.0,"step":1,"group":"Splices and chords"},{"key":"organize_mode","name":"Organize Change","short":"OrgMod","type":"enum","options":["End of Gene","Immediate"],"min":0,"max":1,"default":0.0,"step":1,"group":"Genes"},{"key":"gene_window","name":"Gene Envelope","short":"Env","type":"enum","options":["Edge","Tukey","Gauss","Triangle","Expodec","Rexpodec"],"min":0,"max":5,"default":0.0,"step":1,"group":"Micro"},{"key":"mcr1","name":"Morph Chord 2nd","short":"Chrd2","type":"float","min":-16.0,"max":16.0,"default":2.0,"step":0.01,"group":"Splices and chords"},{"key":"mcr2","name":"Morph Chord 3rd","short":"Chrd3","type":"float","min":-16.0,"max":16.0,"default":3.0,"step":0.01,"group":"Splices and chords"},{"key":"mcr3","name":"Morph Chord 4th","short":"Chrd4","type":"float","min":-16.0,"max":16.0,"default":4.0,"step":0.01,"group":"Splices and chords"},{"key":"sos","name":"Sound On Sound","short":"SOS","type":"float","min":0.0,"max":1.0,"default":1.0,"step":0.01,"group":"Recording","solo":true},{"key":"in_gain","name":"Input Gain","short":"InGain","type":"enum","options":["-3 dB","0 dB","+6 dB","+12 dB"],"min":0,"max":3,"default":1.0,"step":1,"group":"Recording","solo":true},{"key":"rec_source","name":"Record Source","short":"RecSrc","type":"enum","options":["Mix","Input"],"min":0,"max":1,"default":0.0,"step":1,"group":"Recording","solo":true},{"key":"rec_sync","name":"Record Sync","short":"RecSyn","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Recording","solo":true},{"key":"clock_source","name":"Clock Source","short":"Clock","type":"enum","options":["Off","Internal","Move","MIDI"],"min":0,"max":3,"default":0.0,"step":1,"group":"Clock"},{"key":"clock_div","name":"Clock Division","short":"Div","type":"enum","options":["1/16","1/8","1/4","1/2","1 bar"],"min":0,"max":4,"default":2.0,"step":1,"group":"Clock"},{"key":"bpm","name":"Internal BPM","short":"BPM","type":"int","min":20.0,"max":300.0,"default":120.0,"step":1,"group":"Clock"},{"key":"clock_mode","name":"Clock Action","short":"ClkAct","type":"enum","options":["Auto","Gene Shift","Time Stretch"],"min":0,"max":2,"default":0.0,"step":1,"group":"Clock"},{"key":"mute","name":"Mute","short":"Mute","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Play"},{"key":"save_48k","name":"Save at 48 kHz","short":"Save48","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Recording","solo":true},{"key":"scatter","name":"Scatter","short":"Scat","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.005,"group":"Micro"},{"key":"spread","name":"Pitch Spread (st)","short":"Sprd","type":"float","min":0.0,"max":12.0,"default":0.0,"step":0.05,"group":"Micro"},{"key":"width","name":"Stereo Width","short":"Width","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.01,"group":"Micro"},{"key":"threshold","name":"Threshold","short":"Thr","type":"float","min":0.0,"max":1.0,"default":0.5,"step":0.005,"group":"Micro"},{"key":"thr_mode","name":"Selective","short":"Select","type":"enum","options":["Off","Loud","Quiet"],"min":0,"max":2,"default":0.0,"step":1,"group":"Micro"},{"key":"eq_low","name":"EQ Low (dB)","short":"Low","type":"float","min":-15.0,"max":15.0,"default":0.0,"step":0.1,"group":"Effects"},{"key":"eq_mid","name":"EQ Mid (dB)","short":"Mid","type":"float","min":-15.0,"max":15.0,"default":0.0,"step":0.1,"group":"Effects"},{"key":"eq_freq","name":"EQ Mid Freq (Hz)","short":"Freq","type":"float","min":100.0,"max":8000.0,"default":1000.0,"step":10.0,"group":"Effects"},{"key":"eq_high","name":"EQ High (dB)","short":"High","type":"float","min":-15.0,"max":15.0,"default":0.0,"step":0.1,"group":"Effects"},{"key":"dly_time","name":"Delay Time (ms)","short":"Time","type":"float","min":10.0,"max":2000.0,"default":375.0,"step":1.0,"group":"Effects"},{"key":"dly_sync","name":"Delay Sync","short":"Sync","type":"enum","options":["Off","1/16","1/8T","1/8","1/8.","1/4","1/4.","1/2"],"min":0,"max":7,"default":0.0,"step":1,"group":"Effects"},{"key":"dly_fdbk","name":"Delay Feedback","short":"Fdbk","type":"float","min":0.0,"max":0.95,"default":0.4,"step":0.005,"group":"Effects"},{"key":"dly_tone","name":"Delay Tone","short":"Tone","type":"float","min":0.0,"max":1.0,"default":0.6,"step":0.005,"group":"Effects"},{"key":"dly_mix","name":"Delay Mix","short":"Delay","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.005,"group":"Effects"},{"key":"dly_ping","name":"Delay Ping-Pong","short":"Ping","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Effects"},{"key":"rev_decay","name":"Reverb Decay","short":"Decay","type":"float","min":0.0,"max":1.0,"default":0.5,"step":0.005,"group":"Effects"},{"key":"rev_damp","name":"Reverb Damping","short":"Damp","type":"float","min":0.0,"max":1.0,"default":0.5,"step":0.005,"group":"Effects"},{"key":"rev_mix","name":"Reverb Mix","short":"Reverb","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.005,"group":"Effects"},{"key":"fx_rec","name":"Record Through FX","short":"RecFX","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Effects","solo":true},{"key":"hd_mix","name":"Heads Mix","short":"Heads","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.005,"group":"Heads"},{"key":"hd_time","name":"Heads Time","short":"HTime","type":"enum","options":["2 bars","1 bar","1/2.","1/2","1/4.","1/4","1/8.","1/8","1/8T","1/16","1/16T","1/32","1/64","1/128"],"min":0,"max":13,"default":7.0,"step":1,"group":"Heads"},{"key":"hd_heads","name":"Heads","short":"HCount","type":"int","min":1.0,"max":4.0,"default":2.0,"step":1,"group":"Heads"},{"key":"hd_spacing","name":"Head Spacing","short":"Space","type":"float","min":0.0,"max":1.0,"default":0.3,"step":0.005,"group":"Heads"},{"key":"hd_fdbk","name":"Heads Feedback","short":"HFdbk","type":"float","min":0.0,"max":1.0,"default":0.45,"step":0.005,"group":"Heads"},{"key":"hd_reverse","name":"Reverse Heads","short":"Rev","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.005,"group":"Heads"},{"key":"hd_wear","name":"Wear","short":"Wear","type":"enum","options":["Dark","Thin","Crush","Warm","Fold","Fuzz"],"min":0,"max":5,"default":0.0,"step":1,"group":"Heads"},{"key":"hd_wear_amt","name":"Wear Amount","short":"WAmt","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.005,"group":"Heads"},{"key":"hd_mode","name":"Heads Mode","short":"HMode","type":"enum","options":["Fade","Glide","Rise","Fall"],"min":0,"max":3,"default":0.0,"step":1,"group":"Heads"},{"key":"hd_route","name":"Heads Routing","short":"Route","type":"enum","options":["Own","Cross","Chain","Wander"],"min":0,"max":3,"default":0.0,"step":1,"group":"Heads"},{"key":"hd_freeze","name":"Freeze Heads","short":"Freeze","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Heads"},{"key":"gene_reverse","name":"Gene Reverse","short":"GRev","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.005,"group":"Micro"},{"key":"spread_mode","name":"Spread Intervals","short":"Intvl","type":"enum","options":["Free","Semitones","Octaves","Fifths","Major","Minor"],"min":0,"max":5,"default":0.0,"step":1,"group":"Micro"}]
+</script>
+<script src="/static/schwung-remote-api.js"></script>
+<script>
+(function () {
+"use strict";
+
+/* ===================================================== parameters & state */
+const DEFS = JSON.parse(document.getElementById("heimat-params").textContent);
+const D = {};
+DEFS.forEach((d) => { D[d.key] = d; });
+const P = {};
+DEFS.forEach((d) => { P[d.key] = d.default; });
+const LOG = { eq_freq: 1, dly_time: 1, release_ms: 1 };
+const SR0 = 44100;
+
+const qs = new URLSearchParams(location.search);
+const RT = window.schwungRemote;
+let mode = (!RT || qs.get("demo") === "1") ? "demo"
+         : ((RT.component === "tool" || qs.get("tool") === "1") ? "solo" : "chain");
+let prefix = mode === "solo" ? "overtake_dsp:" : (RT && RT.component ? RT.component : "synth") + ":";
+let gotData = false;
+
+/* live view from Heimat Solo (or the demo) */
+const L = {
+  fr: 0, sr: SR0, ns: 1, sel: 0, run: 0, rec: 0, arm: 0, rpos: 0, spd: 1, inp: 0, out: 0,
+  gms: 0, dens: 0, ff: 0, clk: 0, bpm: 120, undo: 0, mk: [], gp: [], pkMax: null, pkMin: null, t: 0,
+};
+const editing = {};              /* key -> time of the last local edit */
+const sendAt = {}, sendPending = {};
+
+function nowMs() { return performance.now(); }
+function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+
+function send(key, v) {
+  P[key] = v;
+  editing[key] = nowMs();
+  markDirty(key);
+  if (mode === "demo") { Demo.onParam(key); return; }
+  const t = nowMs();
+  const fire = () => { sendAt[key] = nowMs(); sendPending[key] = 0; RT.setParam(prefix + key, String(+P[key].toFixed(5))); };
+  if (!sendAt[key] || t - sendAt[key] > 30) fire();
+  else if (!sendPending[key]) { sendPending[key] = 1; setTimeout(fire, 32); }
+}
+function act(key, val) {
+  if (mode === "demo") { Demo.act(key, val); return; }
+  RT.setParam(prefix + key, String(val));
+}
+
+function onParams(params) {
+  let live = false;
+  for (const full in params) {
+    let k = full;
+    if (k.indexOf("overtake_dsp:") === 0) {
+      if (mode !== "solo") { mode = "solo"; prefix = "overtake_dsp:"; setMode(); }
+      k = k.slice(13);
+    } else {
+      const c = k.indexOf(":");
+      if (c >= 0) { if (k.slice(0, c + 1) !== prefix) continue; k = k.slice(c + 1); }
+    }
+    const v = params[full];
+    if (D[k]) {
+      if (editing[k] && nowMs() - editing[k] < 450) continue;
+      const f = parseFloat(v);
+      if (Number.isFinite(f) && f !== P[k]) { P[k] = f; markDirty(k); }
+      gotData = true;
+      continue;
+    }
+    if (k.slice(0, 2) === "v_" || k === "rev") { applyLive(k, v); live = true; }
+  }
+  if (live) { L.t = nowMs(); gotData = true; }
+  if (gotData) setWhere();
+}
+function csv(s) { return s ? String(s).split(",").map(Number).filter(Number.isFinite) : []; }
+function applyLive(k, v) {
+  switch (k) {
+    case "v_fr": L.fr = +v; break;          case "v_sr": L.sr = +v || SR0; break;
+    case "v_ns": L.ns = +v; break;          case "v_sel": L.sel = +v; break;
+    case "v_run": L.run = +v; break;        case "v_rec": L.rec = +v; break;
+    case "v_arm": L.arm = +v; break;        case "v_rpos": L.rpos = +v; break;
+    case "v_spd": L.spd = +v; break;        case "v_in": L.inp = +v; break;
+    case "v_out": L.out = +v; break;        case "v_gms": L.gms = +v; break;
+    case "v_dens": L.dens = +v; break;      case "v_ff": L.ff = +v; break;
+    case "v_clk": L.clk = +v; break;        case "v_bpm": L.bpm = +v; break;
+    case "v_undo": L.undo = +v; break;
+    case "v_save": if (+v === 2 && L.save !== 2) toast("Reel saved"); if (+v === 3 && L.save !== 3) toast("Saving failed"); L.save = +v; break;
+    case "v_mk": L.mk = csv(v); break;
+    case "v_gp": L.gp = csv(v); break;
+    case "v_pk": parsePeaks(v); break;
+  }
+}
+function parsePeaks(s) {
+  const n = Math.floor((s || "").length / 4);
+  const mx = new Float32Array(n), mn = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    mx[i] = (parseInt(s.substr(i * 4, 2), 16) - 128) / 127;
+    mn[i] = (parseInt(s.substr(i * 4 + 2, 2), 16) - 128) / 127;
+  }
+  L.pkMax = mx; L.pkMin = mn;
+}
+
+/* ============================================================ formatting */
+const NOTE = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+function fmtMs(ms) {
+  if (ms >= 1000) return (ms / 1000).toFixed(ms >= 10000 ? 1 : 2) + " s";
+  if (ms >= 100) return Math.round(ms) + " ms";
+  if (ms >= 10) return ms.toFixed(1) + " ms";
+  return ms.toFixed(2) + " ms";
+}
+function pct(v) { return Math.round(v * 100) + "%"; }
+function morphNeff(m) {
+  if (m <= 0.18) return 1;
+  if (m < 0.5) return 1 + (m - 0.18) / 0.32;
+  if (m < 0.6) return 2 + (m - 0.5) / 0.1;
+  if (m < 0.75) return 3;
+  if (m < 0.9) return 3 + (m - 0.75) / 0.15;
+  return 4;
+}
+function morphStage(m) {
+  if (m < 0.18) return "Gaps between genes";
+  if (m < 0.3) return "Seamless loop";
+  if (m < 0.9) return "Overlap ×" + morphNeff(m).toFixed(1);
+  return "Four genes with chords and pan";
+}
+function speedRatio(v) {
+  const u = Math.abs(v);
+  let r;
+  if (u < 0.02) r = 0; else if (u < 0.5) { const t = u / 0.5; r = t * t; } else r = Math.pow(2, (u - 0.5) * 2);
+  return v < 0 ? -r : r;
+}
+function revSec() { return 0.3 * Math.pow(40, P.rev_decay); }
+const SYNC_BEATS = [0, 0.25, 1 / 3, 0.5, 0.75, 1, 1.5, 2];
+function bpmNow() { return (P.clock_source | 0) !== 1 && L.bpm > 0 && mode === "solo" ? L.bpm : P.bpm; }
+function delayMs() { const s = P.dly_sync | 0; return s ? SYNC_BEATS[s] * 60000 / Math.max(20, bpmNow()) : P.dly_time; }
+
+function fmt(key) {
+  const d = D[key], v = P[key];
+  if (d.type === "enum") return d.options[clamp(Math.round(v), 0, d.options.length - 1)];
+  switch (key) {
+    case "gene_size": { if (v < 0.005) return "Splice"; if (mode === "chain") return pct(v); const g = geneGeometry(); return fmtMs(g.len / g.sr * 1000); }
+    case "slide": case "scatter": case "width": case "organize": case "volume": case "dly_fdbk": case "dly_tone":
+    case "dly_mix": case "rev_mix": case "rev_damp": case "hd_mix": case "hd_spacing": case "hd_fdbk": case "hd_reverse":
+    case "hd_wear_amt": case "gene_reverse": return pct(v);
+    case "morph": return v < 0.18 ? "Gaps" : v < 0.3 ? "Loop" : "×" + morphNeff(v).toFixed(1);
+    case "vari_speed": { const r = speedRatio(v); return r === 0 ? "Stop" : (r < 0 ? "−" : "") + "×" + Math.abs(r).toFixed(2); }
+    case "release_ms": return fmtMs(v);
+    case "spread": return v < 0.05 ? "Off" : "±" + v.toFixed(1) + " st";
+    case "threshold": return Math.round(-60 + 60 * v) + " dB";
+    case "eq_low": case "eq_mid": case "eq_high": return (v > 0.05 ? "+" : v < -0.05 ? "−" : "") + Math.abs(v).toFixed(1) + " dB";
+    case "eq_freq": return v >= 1000 ? (v / 1000).toFixed(v >= 5000 ? 1 : 2) + " kHz" : Math.round(v) + " Hz";
+    case "dly_time": return (P.dly_sync | 0) ? D.dly_sync.options[P.dly_sync | 0] : fmtMs(v);
+    case "rev_decay": return revSec().toFixed(1) + " s";
+    case "sos": return v <= 0.005 ? "Input" : v >= 0.995 ? "Reel" : pct(v);
+    case "mcr1": case "mcr2": case "mcr3": return "×" + v.toFixed(2);
+    case "root_note": return NOTE[v % 12] + (Math.floor(v / 12) - 1);
+    case "octave_transpose": case "bend_range": return (v > 0 && key === "octave_transpose" ? "+" : "") + Math.round(v) + (key === "bend_range" ? " st" : "");
+    case "bpm": return Math.round(v) + " BPM";
+    case "divide": return String(Math.round(v));
+    case "splice_base": return NOTE[v % 12] + (Math.floor(v / 12) - 1);
+  }
+  return d.type === "int" ? String(Math.round(v)) : v.toFixed(2);
+}
+
+/* ===================================================== splices and genes */
+function reelFrames() { return L.fr; }
+function bounds() {
+  const fr = reelFrames();
+  if (fr < 2) return [0, 0];
+  if ((P.splice_source | 0) === 1) {
+    const n = Math.max(1, Math.round(P.divide)), b = [];
+    for (let i = 0; i <= n; i++) b.push(Math.round(fr * i / n));
+    return b;
+  }
+  return [0].concat(L.mk.filter((m) => m > 0 && m < fr), [fr]);
+}
+function selected() {
+  const b = bounds(), n = b.length - 1;
+  const i = clamp(L.sel | 0, 0, Math.max(0, n - 1));
+  return { i, n, lo: b[i], hi: b[i + 1], b };
+}
+/* gene length and spacing in output samples, as the engine's gene_metrics */
+function geneGeometry(spliceFrames) {
+  const sr = L.sr || SR0;
+  let len = spliceFrames;
+  if (len === undefined) { const s = selected(); len = s.hi - s.lo; }
+  if (!(len >= 2)) len = sr;                                /* no reel: picture a one-second splice */
+  let aspd = Math.abs(mode === "solo" ? L.spd : speedRatio(P.vari_speed));
+  if (aspd < 1e-3) aspd = 1e-3;
+  const m = P.morph, gk = P.gene_size, w = P.gene_window | 0;
+  const ov = w === 1 || w === 2 || w === 3;
+  let out;
+  if (gk < 0.005) out = len / aspd;
+  else {
+    let tmax = len / sr; const tmin = 0.0005;
+    if (tmax < tmin * 2) tmax = tmin * 2;
+    out = Math.max(16, tmax * Math.pow(tmin / tmax, (gk - 0.005) / 0.995) * sr);
+  }
+  let fade = ov ? out * 0.5 : 64; if (fade > out * 0.5) fade = out * 0.5;
+  let sp = m < 0.18 ? out * (1 + (0.18 - m) / 0.18 * 0.5) : (out - fade) / morphNeff(m);
+  if (sp < 8) sp = 8;
+  return { len: out, spacing: sp, sr, aspd };
+}
+function cloudTag(ms, dens, ff) {
+  return {
+    gene: ms < 2 ? "CLICK" : ms < 40 ? "GRAIN" : "SOUND",
+    dens: dens < 15 ? "RHYTHM" : dens < 25 ? "FLUTTER" : dens < 50 ? "FLOW" : dens < 100 ? "TEXTURE" : "MASS",
+    fill: ff < 0.5 ? "SPARSE" : ff <= 1.1 ? "COVERED" : "PACKED",
+  };
+}
+function envAt(shape, u, lenSamples) {
+  const edgeD = Math.min(u, 1 - u) * lenSamples;
+  const F = Math.max(1, Math.min(64, lenSamples * 0.5));
+  const sm = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+  const edge = sm(edgeD / F);
+  switch (shape) {
+    case 1: return sm(Math.min(u, 1 - u) * 2);
+    case 2: { const d = (u - 0.5) / 0.18; return (Math.exp(-0.5 * d * d) - 0.0211) / 0.9789 * edge; }
+    case 3: return 1 - Math.abs(2 * u - 1);
+    case 4: return Math.exp(-4.6 * u) * edge;
+    case 5: return Math.exp(-4.6 * (1 - u)) * edge;
+    default: return edge;
+  }
+}
+
+/* ============================================================== controls */
+const ctl = {};                 /* key -> {update()} */
+const dirty = new Set();
+function markDirty(k) { dirty.add(k); }
+
+function norm(key) {
+  const d = D[key];
+  if (LOG[key]) return Math.log(P[key] / d.min) / Math.log(d.max / d.min);
+  return (P[key] - d.min) / (d.max - d.min);
+}
+function denorm(key, t) {
+  const d = D[key];
+  t = clamp(t, 0, 1);
+  let v = LOG[key] ? d.min * Math.pow(d.max / d.min, t) : d.min + t * (d.max - d.min);
+  if (d.type === "int") v = Math.round(v);
+  return v;
+}
+function arc(cx, cy, r, a0, a1) {
+  const p = (a) => [cx + r * Math.sin(a), cy - r * Math.cos(a)];
+  const [x0, y0] = p(a0), [x1, y1] = p(a1);
+  return "M" + x0.toFixed(2) + " " + y0.toFixed(2) + "A" + r + " " + r + " 0 " + (Math.abs(a1 - a0) > Math.PI ? 1 : 0) + " " + (a1 > a0 ? 1 : 0) + " " + x1.toFixed(2) + " " + y1.toFixed(2);
+}
+const A0 = -0.75 * Math.PI, A1 = 0.75 * Math.PI;
+/* the silkscreened scale round every knob: eleven ticks, longer at the ends and the centre */
+const KNOB_TICKS = (function () {
+  let t = "";
+  for (let i = 0; i <= 10; i++) {
+    const a = A0 + (A1 - A0) * i / 10, r1 = i % 5 === 0 ? 20 : 21.5, r2 = 24.5;
+    t += '<line class="tick" x1="' + (32 + r1 * Math.sin(a)).toFixed(2) + '" y1="' + (32 - r1 * Math.cos(a)).toFixed(2) +
+      '" x2="' + (32 + r2 * Math.sin(a)).toFixed(2) + '" y2="' + (32 - r2 * Math.cos(a)).toFixed(2) + '"/>';
+  }
+  return t;
+})();
+
+function knob(key, label) {
+  const d = D[key];
+  const el = document.createElement("div");
+  el.className = "knob";
+  el.innerHTML =
+    '<div class="num"></div><div class="dial" role="slider" tabindex="0" aria-label="' + (label || d.name) + '">' +
+    '<svg viewBox="0 0 64 64" aria-hidden="true">' + KNOB_TICKS + '<path class="trk" d="' + arc(32, 32, 29, A0, A1) + '"/>' +
+    '<path class="val"/><circle class="cap" cx="32" cy="32" r="17"/><line class="ptr" x1="32" y1="32" x2="32" y2="18"/></svg></div>' +
+    '<div class="lbl">' + (label || d.name.replace(/ \(.*\)$/, "")) + "</div>";
+  const dial = el.querySelector(".dial"), val = el.querySelector(".val"), ptr = el.querySelector(".ptr"), num = el.querySelector(".num");
+  const bip = d.min < 0 && d.max > 0;
+  function update() {
+    const t = clamp(norm(key), 0, 1), a = A0 + t * (A1 - A0);
+    const from = bip ? 0 : A0;
+    val.setAttribute("d", Math.abs(a - from) < 0.01 ? "" : arc(32, 32, 29, Math.min(from, a), Math.max(from, a)));
+    ptr.setAttribute("x2", (32 + 14 * Math.sin(a)).toFixed(2));
+    ptr.setAttribute("y2", (32 - 14 * Math.cos(a)).toFixed(2));
+    const s = fmt(key);
+    num.textContent = s;
+    dial.setAttribute("aria-valuemin", d.min); dial.setAttribute("aria-valuemax", d.max);
+    dial.setAttribute("aria-valuenow", P[key]); dial.setAttribute("aria-valuetext", s);
+    el.classList.toggle("disabled", key === "dly_time" && (P.dly_sync | 0) > 0);
+  }
+  function setT(t) { send(key, denorm(key, t)); }
+  let drag = null;
+  dial.addEventListener("pointerdown", (e) => {
+    dial.setPointerCapture(e.pointerId);
+    drag = { y: e.clientY, t: norm(key) };
+    e.preventDefault();
+    dial.focus({ preventScroll: true });
+  });
+  dial.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const span = e.shiftKey ? 900 : 180;
+    setT(drag.t + (drag.y - e.clientY) / span);
+  });
+  const end = () => { drag = null; };
+  dial.addEventListener("pointerup", end); dial.addEventListener("pointercancel", end);
+  dial.addEventListener("dblclick", () => send(key, d.default));
+  dial.addEventListener("wheel", (e) => { e.preventDefault(); setT(norm(key) - Math.sign(e.deltaY) * (e.shiftKey ? 0.002 : 0.012)); }, { passive: false });
+  dial.addEventListener("keydown", (e) => {
+    const big = e.key === "PageUp" || e.key === "PageDown";
+    const dir = { ArrowUp: 1, ArrowRight: 1, PageUp: 1, ArrowDown: -1, ArrowLeft: -1, PageDown: -1 }[e.key];
+    if (dir) {
+      e.preventDefault();
+      if (d.type === "int") send(key, clamp(P[key] + dir * (big ? 10 : 1), d.min, d.max));
+      else setT(norm(key) + dir * (big ? 0.1 : e.shiftKey ? 0.002 : 0.01));
+    } else if (e.key === "Home") { e.preventDefault(); send(key, d.min); }
+    else if (e.key === "End") { e.preventDefault(); send(key, d.max); }
+  });
+  ctl[key] = { update };
+  update();
+  return el;
+}
+
+function seg(key, label, opts) {
+  const d = D[key];
+  const el = document.createElement("div");
+  el.className = "seg" + ((opts || d.options).length > 5 ? " dense" : "");
+  const names = opts || d.options;
+  el.innerHTML = '<div class="lbl">' + (label || d.name) + '</div><div class="opts" role="radiogroup" aria-label="' + (label || d.name) + '"></div>';
+  const box = el.querySelector(".opts");
+  const btns = names.map((n, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.setAttribute("role", "radio"); b.textContent = n;
+    b.addEventListener("click", () => send(key, i));
+    b.addEventListener("keydown", (e) => {
+      const dir = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+      if (!dir) return;
+      e.preventDefault();
+      const j = clamp((P[key] | 0) + dir, 0, names.length - 1);
+      send(key, j); btns[j].focus();
+    });
+    box.appendChild(b);
+    return b;
+  });
+  function update() {
+    btns.forEach((b, i) => { const on = (P[key] | 0) === i; b.setAttribute("aria-checked", on); b.tabIndex = on ? 0 : -1; });
+  }
+  ctl[key] = { update };
+  update();
+  return el;
+}
+
+function stepper(key, label) {
+  const d = D[key];
+  const el = document.createElement("div");
+  el.className = "step";
+  el.innerHTML = '<div class="lbl">' + (label || d.name) + '</div><div class="box"><button type="button" aria-label="Lower ' +
+    (label || d.name) + '">−</button><output aria-live="polite"></output><button type="button" aria-label="Raise ' + (label || d.name) + '">+</button></div>';
+  const [dn, up] = el.querySelectorAll("button"), out = el.querySelector("output");
+  dn.addEventListener("click", () => send(key, clamp(Math.round(P[key]) - 1, d.min, d.max)));
+  up.addEventListener("click", () => send(key, clamp(Math.round(P[key]) + 1, d.min, d.max)));
+  function update() { out.textContent = fmt(key); }
+  ctl[key] = { update };
+  update();
+  return el;
+}
+
+function put(id, nodes) { const g = document.getElementById(id); nodes.forEach((n) => g.appendChild(n)); }
+/* several rows in one panel: knobs on one line, choices on the next */
+function rows(id, list) {
+  const g = document.getElementById(id);
+  g.classList.remove("row");
+  list.forEach((nodes, i) => {
+    const r = document.createElement("div");
+    r.className = "row" + (i ? " gap" : "") + (nodes.every((n) => n.classList.contains("knob")) ? " knobs" : "");
+    nodes.forEach((n) => r.appendChild(n));
+    g.appendChild(r);
+  });
+}
+
+/* envelope picker with the six shapes drawn from the engine's curves */
+(function buildEnvs() {
+  const box = document.getElementById("envs");
+  const btns = D.gene_window.options.map((name, i) => {
+    let path = "";
+    for (let x = 0; x <= 40; x++) {
+      const y = 20 - envAt(i, x / 40, i === 0 ? 400 : 4000) * 17;
+      path += (x ? "L" : "M") + (x + 3) + " " + y.toFixed(1);
+    }
+    const b = document.createElement("button");
+    b.type = "button"; b.setAttribute("role", "radio");
+    b.innerHTML = '<svg viewBox="0 0 46 22" aria-hidden="true"><path d="' + path + '"/></svg>' + name;
+    b.addEventListener("click", () => send("gene_window", i));
+    box.appendChild(b);
+    return b;
+  });
+  ctl.gene_window = { update() { btns.forEach((b, i) => b.setAttribute("aria-checked", (P.gene_window | 0) === i)); } };
+  ctl.gene_window.update();
+})();
+
+put("gGenes", [knob("gene_size"), knob("slide"), knob("morph"), knob("vari_speed"), knob("organize"), seg("organize_mode", "Splice change", ["End of gene", "Immediate"])]);
+rows("gMicro", [[knob("scatter"), knob("spread", "Spread"), knob("gene_reverse", "Reverse"), knob("width", "Width"), knob("threshold")],
+  [seg("spread_mode", "Spread: which intervals the genes may jump", ["Free", "Semitones", "Octaves", "Fifths", "Major", "Minor"])],
+  [seg("thr_mode", "Selective: play only the genes that are")]]);
+put("gEq", [knob("eq_low", "Low"), knob("eq_mid", "Mid"), knob("eq_freq", "Mid freq"), knob("eq_high", "High")]);
+put("gDly", [knob("dly_time", "Time"), knob("dly_fdbk", "Feedback"), knob("dly_tone", "Tone"), knob("dly_mix", "Mix")]);
+document.getElementById("gDly").insertAdjacentElement("afterend", (function () {
+  const r = document.createElement("div"); r.className = "row";
+  r.appendChild(seg("dly_sync", "Sync", ["Free", "1/16", "1/8T", "1/8", "1/8.", "1/4", "1/4.", "1/2"]));
+  r.appendChild(seg("dly_ping", "Ping-pong")); r.classList.add("gap"); return r;
+})());
+put("gRev", [knob("rev_decay", "Decay"), knob("rev_damp", "Damping"), knob("rev_mix", "Mix")]);
+document.getElementById("gRev").insertAdjacentElement("afterend", (function () {
+  const r = document.createElement("div"); r.className = "row solo-only";
+  r.appendChild(seg("fx_rec", "Record through FX")); r.classList.add("gap"); return r;
+})());
+rows("gHeads", [[knob("hd_mix", "Heads mix"), knob("hd_spacing", "Spacing"), knob("hd_fdbk", "Feedback"), knob("hd_reverse", "Reverse"), knob("hd_wear_amt", "Wear")],
+  [stepper("hd_time", "Time"), stepper("hd_heads", "Heads per side")]]);
+rows("gHeadsB", [[seg("hd_wear", "Wear: what each pass does")], [seg("hd_mode", "Mode")], [seg("hd_route", "Routing")], [seg("hd_freeze", "Freeze")]]);
+rows("gPlay", [[seg("pad_mode"), seg("play_mode")], [knob("volume"), knob("release_ms", "Release"), seg("mute")],
+  [stepper("root_note", "Root note"), stepper("octave_transpose", "Octave"), stepper("bend_range", "Bend range")]]);
+rows("gSplices", [[seg("splice_source"), stepper("divide", "Divide into"), stepper("splice_base", "Splice pad base")],
+  [knob("mcr1", "Chord 2nd"), knob("mcr2", "Chord 3rd"), knob("mcr3", "Chord 4th")]]);
+rows("gRec", [[knob("sos", "Sound on sound"), seg("in_gain"), seg("rec_source")], [seg("rec_sync", "Record sync"), seg("save_48k")]]);
+rows("gClock", [[seg("clock_source"), seg("clock_div")], [seg("clock_mode", "Clock action"), stepper("bpm", "Internal BPM")]]);
+
+/* ============================================================== canvases */
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+let COL = {};
+/* the graphs are drawn in the panel's windows: acid for what is alive,
+   magenta for cuts, cream for the rest */
+function readColors() {
+  COL = { silk: "#efe6d2", paper: "#efe6d2", dim: "#847d70", grid: "rgba(239, 230, 210, .16)", line: "rgba(239, 230, 210, .16)",
+    grease: "#d4ff3a", red: "#ff3d9a", rec: "#ff3d9a", splice: "#efe6d2", wash: "rgba(212, 255, 58, .06)" };
+}
+readColors();
+matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => { readColors(); markDirty("*"); });
+
+function fit(cv) {
+  const r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { g, w: r.width, h: r.height };
+}
+
+/* ---- the reel: waveform, grease-pencil splice marks, genes, record head */
+const reelCv = document.getElementById("reel");
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const view = { hover: -1, drag: null };
+function xOf(f, w) { return 6 + (w - 12) * f / Math.max(1, reelFrames()); }
+function fOf(x, w) { return clamp((x - 6) / (w - 12), 0, 1) * reelFrames(); }
+
+function drawReel() {
+  if (mode === "chain") return;
+  const { g, w, h } = fit(reelCv);
+  g.clearRect(0, 0, w, h);
+  const fr = reelFrames(), mid = h * 0.58, amp = h * 0.32;
+  const empty = document.getElementById("reelEmpty");
+  if (fr < 2 || !L.pkMax) {
+    empty.hidden = false;
+    empty.textContent = mode === "chain"
+      ? "The reel view comes from Heimat Solo. In a track slot the editor shows the sound as parameters: genes, micro and effects below."
+      : (gotData ? "Empty reel. Record from the Move input, or load a WAV from the menu on the Move." : "Waiting for Heimat");
+    return;
+  }
+  empty.hidden = true;
+  const s = selected();
+  const x0 = xOf(s.lo, w), x1 = xOf(s.hi, w), top = 26;
+  /* the selected splice: framed in acid */
+  g.fillStyle = COL.wash; g.fillRect(x0, top, x1 - x0, h - top - 2);
+  g.strokeStyle = COL.grease; g.lineWidth = 1.5;
+  g.strokeRect(x0 + 0.75, top + 0.75, Math.max(1, x1 - x0 - 1.5), h - top - 3.5);
+  /* the waveform as a drawing: two contour lines and a light hatching */
+  const n = L.pkMax.length;
+  const X = (c) => 6 + (w - 12) * (c + 0.5) / n;
+  const yT = (c) => mid - Math.max(0.004, L.pkMax[c]) * amp, yB = (c) => mid - Math.min(-0.004, L.pkMin[c]) * amp;
+  function wave(color, alpha) {
+    g.strokeStyle = color;
+    g.globalAlpha = alpha * 0.3; g.lineWidth = 1;
+    g.beginPath();
+    for (let c = 0; c < n; c += 2) { const x = X(c); g.moveTo(x, yT(c)); g.lineTo(x, yB(c)); }
+    g.stroke();
+    g.globalAlpha = alpha; g.lineWidth = 1.3;
+    g.beginPath(); for (let c = 0; c < n; c++) { if (c) g.lineTo(X(c), yT(c)); else g.moveTo(X(c), yT(c)); } g.stroke();
+    g.beginPath(); for (let c = 0; c < n; c++) { if (c) g.lineTo(X(c), yB(c)); else g.moveTo(X(c), yB(c)); } g.stroke();
+    g.globalAlpha = 1;
+  }
+  wave(COL.dim, 1);
+  g.save(); g.beginPath(); g.rect(x0, 0, x1 - x0, h); g.clip(); wave(COL.silk, 1); g.restore();
+  /* the cuts: dashed magenta lines, each splice numbered in a circle */
+  const fnt = getComputedStyle(document.body).getPropertyValue("--label");
+  g.font = "700 10px " + fnt; g.textAlign = "center"; g.textBaseline = "middle";
+  for (let i = 0; i < s.b.length - 1; i++) {
+    const xa = xOf(s.b[i], w), xb = xOf(s.b[i + 1], w);
+    if (i > 0) {
+      g.globalAlpha = (P.splice_source | 0) === 0 ? 1 : 0.55;
+      g.strokeStyle = COL.red; g.lineWidth = view.hover === i - 1 ? 2.6 : 1.6; g.setLineDash([5, 3]);
+      g.beginPath(); g.moveTo(xa, top); g.lineTo(xa, h - 2); g.stroke(); g.setLineDash([]);
+      g.globalAlpha = 1;
+    }
+    if (xb - xa > 24) {
+      const cx = xa + 12, sel = i === s.i;
+      g.beginPath(); g.arc(cx, 11, 9, 0, Math.PI * 2);
+      if (sel) { g.fillStyle = COL.grease; g.fill(); } else { g.strokeStyle = COL.dim; g.lineWidth = 1; g.stroke(); }
+      g.fillStyle = sel ? "#000" : COL.silk; g.fillText(String(i + 1), cx, 11.5);
+    }
+  }
+  g.textAlign = "start"; g.textBaseline = "alphabetic";
+  /* genes: where they read, moving with the speed between updates; each one
+     sends out rings, like a drop in water */
+  const dt = mode === "demo" ? 0 : clamp((nowMs() - L.t) / 1000, 0, 0.08);
+  const step = L.spd * (L.sr || SR0) * dt;
+  const span = Math.max(1, s.hi - s.lo);
+  const geo = geneGeometry(s.hi - s.lo);
+  const gw = clamp((w - 12) * Math.min(geo.len * geo.aspd, span) / fr, 2, Math.max(2, x1 - x0));
+  const t = nowMs() / 1000;
+  L.gp.forEach((p0, k) => {
+    let p = p0 + step;
+    if (p0 >= s.lo && p0 < s.hi) p = s.lo + ((((p - s.lo) % span) + span) % span);
+    const x = xOf(p, w);
+    g.fillStyle = COL.grease; g.globalAlpha = 0.1;
+    g.fillRect(L.spd < 0 ? x : x - gw, mid - amp - 4, gw, 2 * amp + 8);
+    g.globalAlpha = 1; g.strokeStyle = COL.grease;
+    for (let r = 0; r < 3; r++) {
+      const ph = ((t * (reduceMotion ? 0 : 0.9) + r / 3 + k * 0.17) % 1);
+      g.globalAlpha = 0.85 * (1 - ph); g.lineWidth = 1.2;
+      g.beginPath(); g.arc(x, mid, 3 + ph * 22, 0, Math.PI * 2); g.stroke();
+    }
+    g.globalAlpha = 1;
+    g.fillStyle = COL.grease; g.beginPath(); g.arc(x, mid, 2.6, 0, Math.PI * 2); g.fill();
+    g.fillRect(x - 0.6, mid - amp - 6, 1.2, 2 * amp + 12);
+  });
+  /* record head */
+  if (L.rec) {
+    const x = xOf(L.rpos, w);
+    g.fillStyle = COL.rec; g.fillRect(x - 1, top, 2, h - top);
+    g.beginPath(); g.arc(x, top, 4.5, 0, Math.PI * 2); g.fill();
+  }
+}
+
+function hitMarker(x, w) {
+  if ((P.splice_source | 0) !== 0) return -1;
+  let best = -1, bd = 7;
+  L.mk.forEach((m, i) => { const d = Math.abs(xOf(m, w) - x); if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+reelCv.addEventListener("pointermove", (e) => {
+  const r = reelCv.getBoundingClientRect(), x = e.clientX - r.left;
+  if (view.drag) { view.drag.f = Math.round(fOf(x, r.width)); L.mk[view.drag.i] = view.drag.f; return; }
+  const m = mode === "chain" ? -1 : hitMarker(x, r.width);
+  if (m !== view.hover) { view.hover = m; reelCv.style.cursor = m >= 0 ? "ew-resize" : "pointer"; }
+});
+reelCv.addEventListener("pointerdown", (e) => {
+  if (mode === "chain" || reelFrames() < 2) return;
+  const r = reelCv.getBoundingClientRect(), x = e.clientX - r.left;
+  const m = hitMarker(x, r.width);
+  if (m >= 0) { reelCv.setPointerCapture(e.pointerId); view.drag = { i: m, f: L.mk[m], x0: x }; return; }
+  const f = fOf(x, r.width), b = bounds();
+  for (let i = 0; i < b.length - 1; i++) if (f >= b[i] && f < b[i + 1]) { L.sel = i; act("sel_splice", i); break; }
+});
+reelCv.addEventListener("pointerup", (e) => {
+  if (!view.drag) return;
+  const d = view.drag; view.drag = null;
+  const r = reelCv.getBoundingClientRect();
+  if (Math.abs(e.clientX - r.left - d.x0) > 2) act("marker_move", d.i + "," + d.f);
+});
+reelCv.addEventListener("dblclick", (e) => {
+  if (mode === "chain" || reelFrames() < 2) return;
+  const r = reelCv.getBoundingClientRect(), x = e.clientX - r.left;
+  const m = hitMarker(x, r.width);
+  if (m >= 0) { act("marker_del", m); toast("Marker removed"); }
+  else if ((P.splice_source | 0) === 0) { act("marker_add", Math.round(fOf(x, r.width))); toast("Marker added"); }
+});
+
+/* ---- genes over time */
+const trainCv = document.getElementById("train");
+function drawTrain() {
+  const { g, w, h } = fit(trainCv);
+  g.clearRect(0, 0, w, h);
+  const s = selected();
+  const geo = geneGeometry(reelFrames() > 1 ? s.hi - s.lo : undefined);
+  const shape = P.gene_window | 0;
+  const neff = morphNeff(P.morph);
+  const lanes = P.morph < 0.18 ? 1 : Math.ceil(neff);
+  const windowS = Math.max(geo.spacing * 6, geo.len * 1.6);
+  const px = (w - 16) / windowS, top = 10, laneH = (h - 26) / Math.max(1, lanes);
+  /* time grid */
+  g.strokeStyle = COL.line; g.lineWidth = 1; g.globalAlpha = 0.6;
+  for (let i = 0; i <= 4; i++) { const x = 8 + (w - 16) * i / 4; g.beginPath(); g.moveTo(x, h - 14); g.lineTo(x, h - 10); g.stroke(); }
+  g.globalAlpha = 1;
+  g.fillStyle = COL.dim; g.font = "12px " + getComputedStyle(document.body).getPropertyValue("--label");
+  g.textBaseline = "alphabetic";
+  if (mode !== "chain") g.fillText(fmtMs(windowS / geo.sr * 1000), w - 8 - g.measureText(fmtMs(windowS / geo.sr * 1000)).width, h - 2);
+  g.fillText("0", 8, h - 2);
+  /* genes, each with its envelope; the fourth (chords) in magenta */
+  let k = 0;
+  for (let t = 0; t < windowS && k < 400; t += geo.spacing, k++) {
+    const lane = k % lanes, rank = k % 4;
+    const y0 = top + lane * laneH, gh = laneH - 4;
+    const chord = P.morph >= 0.75 && rank === 3;
+    g.beginPath();
+    const steps = Math.max(8, Math.min(60, Math.round(geo.len * px)));
+    for (let i = 0; i <= steps; i++) {
+      const u = i / steps, x = 8 + (t + u * geo.len) * px;
+      const y = y0 + gh - envAt(shape, u, geo.len) * gh;
+      if (i === 0) g.moveTo(x, y0 + gh);
+      g.lineTo(x, y);
+    }
+    g.lineTo(8 + (t + geo.len) * px, y0 + gh);
+    g.closePath();
+    g.fillStyle = chord ? COL.red : COL.grease;
+    g.globalAlpha = 0.07; g.fill(); g.globalAlpha = 1;
+    g.strokeStyle = chord ? COL.red : COL.grease; g.lineWidth = 1.3; g.stroke();
+  }
+  document.getElementById("morphStage").textContent = morphStage(P.morph);
+}
+
+/* ---- EQ: the exact response of the three filters */
+const eqCv = document.getElementById("eq");
+const EQ = { fmin: 30, fmax: 16000, db: 16 };
+function bq(type, f, db, Q) {
+  const A = Math.pow(10, db / 40), w0 = 2 * Math.PI * f / 44100, cs = Math.cos(w0), sn = Math.sin(w0);
+  let b0, b1, b2, a0, a1, a2;
+  if (type === "peak") {
+    const al = sn / (2 * Q);
+    b0 = 1 + al * A; b1 = -2 * cs; b2 = 1 - al * A; a0 = 1 + al / A; a1 = -2 * cs; a2 = 1 - al / A;
+  } else {
+    const al = sn * 0.70710678, sa = 2 * Math.sqrt(A) * al;
+    if (type === "low") {
+      b0 = A * ((A + 1) - (A - 1) * cs + sa); b1 = 2 * A * ((A - 1) - (A + 1) * cs); b2 = A * ((A + 1) - (A - 1) * cs - sa);
+      a0 = (A + 1) + (A - 1) * cs + sa; a1 = -2 * ((A - 1) + (A + 1) * cs); a2 = (A + 1) + (A - 1) * cs - sa;
+    } else {
+      b0 = A * ((A + 1) + (A - 1) * cs + sa); b1 = -2 * A * ((A - 1) + (A + 1) * cs); b2 = A * ((A + 1) + (A - 1) * cs - sa);
+      a0 = (A + 1) - (A - 1) * cs + sa; a1 = 2 * ((A - 1) - (A + 1) * cs); a2 = (A + 1) - (A - 1) * cs - sa;
+    }
+  }
+  return [b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0];
+}
+function bqDb(c, f) {
+  const w = 2 * Math.PI * f / 44100;
+  const cr = (k) => Math.cos(k * w), si = (k) => -Math.sin(k * w);
+  const nr = c[0] + c[1] * cr(1) + c[2] * cr(2), ni = c[1] * si(1) + c[2] * si(2);
+  const dr = 1 + c[3] * cr(1) + c[4] * cr(2), di = c[3] * si(1) + c[4] * si(2);
+  return 10 * Math.log10((nr * nr + ni * ni) / (dr * dr + di * di));
+}
+function eqX(f, w) { return 8 + (w - 16) * Math.log(f / EQ.fmin) / Math.log(EQ.fmax / EQ.fmin); }
+function eqF(x, w) { return EQ.fmin * Math.pow(EQ.fmax / EQ.fmin, clamp((x - 8) / (w - 16), 0, 1)); }
+function eqY(db, h) { return h / 2 - db / EQ.db * (h / 2 - 10); }
+function eqDbAt(y, h) { return clamp((h / 2 - y) / (h / 2 - 10) * EQ.db, -15, 15); }
+const eqNodes = () => [
+  { key: "eq_low", f: 180 }, { key: "eq_mid", f: clamp(P.eq_freq, 100, 8000), fk: "eq_freq" }, { key: "eq_high", f: 5000 },
+];
+function drawEq() {
+  const { g, w, h } = fit(eqCv);
+  g.clearRect(0, 0, w, h);
+  g.strokeStyle = COL.grid; g.lineWidth = 1;
+  [100, 1000, 10000].forEach((f) => { const x = eqX(f, w); g.beginPath(); g.moveTo(x, 6); g.lineTo(x, h - 6); g.stroke(); });
+  g.setLineDash([2, 4]); g.beginPath(); g.moveTo(8, h / 2); g.lineTo(w - 8, h / 2); g.stroke(); g.setLineDash([]);
+  g.fillStyle = COL.dim; g.font = "11px " + getComputedStyle(document.body).getPropertyValue("--label");
+  [["100", 100], ["1k", 1000], ["10k", 10000]].forEach(([t, f]) => g.fillText(t, eqX(f, w) + 3, h - 6));
+  const c = [bq("low", 180, P.eq_low), bq("peak", clamp(P.eq_freq, 20, 19000), P.eq_mid, 0.8), bq("high", 5000, P.eq_high)];
+  g.beginPath();
+  for (let x = 8; x <= w - 8; x += 1.5) {
+    const f = eqF(x, w), db = bqDb(c[0], f) + bqDb(c[1], f) + bqDb(c[2], f);
+    const y = eqY(db, h);
+    if (x === 8) g.moveTo(x, y); else g.lineTo(x, y);
+  }
+  g.strokeStyle = COL.grease; g.lineWidth = 2; g.stroke();
+  g.lineTo(w - 8, h / 2); g.lineTo(8, h / 2); g.closePath();
+  g.fillStyle = COL.grease; g.globalAlpha = 0.06; g.fill(); g.globalAlpha = 1;
+  eqNodes().forEach((n, i) => {
+    const x = eqX(n.f, w), y = eqY(P[n.key], h);
+    g.beginPath(); g.arc(x, y, eqDrag && eqDrag.i === i ? 7 : 5.5, 0, Math.PI * 2);
+    g.fillStyle = "#060606"; g.fill(); g.strokeStyle = COL.silk; g.lineWidth = 1.8; g.stroke();
+  });
+}
+let eqDrag = null;
+eqCv.addEventListener("pointerdown", (e) => {
+  const r = eqCv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  let best = -1, bd = 22;
+  eqNodes().forEach((n, i) => { const d = Math.hypot(eqX(n.f, r.width) - x, eqY(P[n.key], r.height) - y); if (d < bd) { bd = d; best = i; } });
+  if (best < 0) return;
+  eqCv.setPointerCapture(e.pointerId);
+  eqDrag = { i: best };
+});
+eqCv.addEventListener("pointermove", (e) => {
+  if (!eqDrag) return;
+  const r = eqCv.getBoundingClientRect(), n = eqNodes()[eqDrag.i];
+  send(n.key, Math.round(eqDbAt(e.clientY - r.top, r.height) * 10) / 10);
+  if (n.fk) send(n.fk, Math.round(clamp(eqF(e.clientX - r.left, r.width), 100, 8000)));
+});
+eqCv.addEventListener("pointerup", () => { eqDrag = null; markDirty("eq_low"); });
+eqCv.addEventListener("dblclick", () => { ["eq_low", "eq_mid", "eq_high"].forEach((k) => send(k, 0)); send("eq_freq", 1000); });
+
+/* ---- delay echoes, left and right */
+const dlyCv = document.getElementById("dly");
+function drawDly() {
+  const { g, w, h } = fit(dlyCv);
+  g.clearRect(0, 0, w, h);
+  const T = delayMs(), span = 2400, base = h - 16, top = 14;
+  g.fillStyle = COL.dim; g.font = "11px " + getComputedStyle(document.body).getPropertyValue("--label");
+  g.fillText("0", 8, h - 3); g.fillText("2.4 s", w - 30, h - 3);
+  g.strokeStyle = COL.grid; g.beginPath(); g.moveTo(8, base + 0.5); g.lineTo(w - 8, base + 0.5); g.stroke();
+  const xT = (ms) => 8 + (w - 16) * ms / span;
+  const wet = P.dly_mix, dry = wet < 0.5 ? 1 : 2 * (1 - wet), wg = wet > 0.5 ? 1 : 2 * wet;
+  const stem = (x, hh, col) => {
+    g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(x, base); g.lineTo(x, base - hh); g.stroke();
+    g.beginPath(); g.arc(x, base - hh, 3.2, 0, Math.PI * 2); g.fill();
+  };
+  stem(xT(0) + 2, (base - top) * dry, COL.silk);
+  const ping = (P.dly_ping | 0) === 1;
+  let a = wg;
+  for (let k = 1; k < 40; k++) {
+    const t = k * T;
+    if (t > span || a < 0.01) break;
+    stem(xT(t) + 2, (base - top - 4) * a, ping && k % 2 === 0 ? COL.silk : COL.grease);
+    a *= P.dly_fdbk * (0.75 + 0.25 * P.dly_tone);
+  }
+  const lab = (P.dly_sync | 0) ? D.dly_sync.options[P.dly_sync | 0] + " at " + Math.round(bpmNow()) + " BPM" : fmtMs(T);
+  g.fillStyle = COL.paper; g.font = "700 12px " + getComputedStyle(document.body).getPropertyValue("--label");
+  g.fillText(lab + (ping ? ", left and right" : ""), 10, 16);
+}
+
+/* ---- reverb decay: the whole band and, faster, the highs */
+const revCv = document.getElementById("rev");
+function drawRev() {
+  const { g, w, h } = fit(revCv);
+  g.clearRect(0, 0, w, h);
+  const T = revSec(), span = Math.max(3, Math.min(14, T * 1.4)), base = h - 16, top = 22;
+  const hiT = T * (1 - 0.82 * P.rev_damp);
+  /* the decay as nested contour lines, brighter with more reverb in the mix */
+  for (let k = 0; k < 7; k++) {
+    const sc = 1 - k * 0.14;
+    g.beginPath();
+    for (let x = 8; x <= w - 8; x += 2) {
+      const t = (x - 8) / (w - 16) * span;
+      const y = base - (base - top) * sc * clamp(1 - t / T, 0, 1);
+      if (x === 8) g.moveTo(x, y); else g.lineTo(x, y);
+    }
+    g.strokeStyle = COL.grease; g.lineWidth = 1.2; g.globalAlpha = (0.25 + 0.75 * Math.max(0.15, P.rev_mix)) * (1 - k * 0.12); g.stroke();
+  }
+  g.globalAlpha = 1; g.setLineDash([4, 4]);
+  g.beginPath();
+  for (let x = 8; x <= w - 8; x += 2) {
+    const t = (x - 8) / (w - 16) * span, y = base - (base - top) * clamp(1 - t / hiT, 0, 1);
+    if (x === 8) g.moveTo(x, y); else g.lineTo(x, y);
+  }
+  g.strokeStyle = COL.silk; g.lineWidth = 1.5; g.stroke(); g.setLineDash([]);
+  g.strokeStyle = COL.grid; g.beginPath(); g.moveTo(8, base + 0.5); g.lineTo(w - 8, base + 0.5); g.stroke();
+  g.fillStyle = COL.dim; g.font = "11px " + getComputedStyle(document.body).getPropertyValue("--label");
+  g.fillText("0", 8, h - 3); const e = span.toFixed(0) + " s"; g.fillText(e, w - 8 - g.measureText(e).width, h - 3);
+  g.fillStyle = COL.paper; g.font = "700 12px " + getComputedStyle(document.body).getPropertyValue("--label");
+  g.fillText(T.toFixed(1) + " s to silence, highs " + hiT.toFixed(1) + " s", 10, 16);
+}
+
+/* ---- the heads: where each one reads on the tape, left above right */
+const headsCv = document.getElementById("headsCv");
+const HD_BEATS = [8, 4, 3, 2, 1.5, 1, 0.75, 0.5, 1 / 3, 0.25, 1 / 6, 0.125, 0.0625, 0.03125];
+function headTimes() {
+  const route = P.hd_route | 0, n = clamp(Math.round(P.hd_heads), 1, 4), lines = route >= 2 ? 4 : n;
+  const T = HD_BEATS[clamp(P.hd_time | 0, 0, 13)] * 60 / Math.max(20, bpmNow()), sp = P.hd_spacing;
+  const rc = Math.round(P.hd_reverse * 2 * lines), out = [];
+  for (let c = 0; c < 2; c++) for (let k = 0; k < n; k++) {
+    let t = route >= 2 ? T * (1 + 0.25 * k * sp) : T * (1 + k * (0.07 + 0.93 * sp));
+    if (c) t *= 1 + 0.02 * sp;
+    out.push({ t: Math.min(t, 5.9), rev: 2 * k + c < rc, c, k });
+  }
+  return { heads: out, T, route, n };
+}
+function drawHeadsCv() {
+  const { g, w, h } = fit(headsCv);
+  g.clearRect(0, 0, w, h);
+  const { heads, route } = headTimes();
+  const span = Math.max(...heads.map((x) => x.t)) * 1.15;
+  const lane = [h * 0.38, h * 0.72], x0 = 34, X = (t) => x0 + (w - x0 - 12) * t / span;
+  const fnt = getComputedStyle(document.body).getPropertyValue("--label");
+  g.font = "700 10px " + fnt; g.fillStyle = COL.dim; g.textBaseline = "middle";
+  g.fillText("L", 12, lane[0]); g.fillText("R", 12, lane[1]);
+  for (let c = 0; c < 2; c++) {
+    g.strokeStyle = COL.silk; g.globalAlpha = 0.5; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(x0, lane[c]); g.lineTo(w - 10, lane[c]); g.stroke(); g.globalAlpha = 1;
+    g.fillStyle = COL.silk; g.beginPath(); g.arc(x0, lane[c], 3, 0, Math.PI * 2); g.fill();     /* the sound comes in here */
+  }
+  /* the routing, as links between the heads */
+  g.strokeStyle = COL.dim; g.setLineDash([3, 3]);
+  const at = (c, k) => { const x = heads.find((q) => q.c === c && q.k === k); return x ? [X(x.t), lane[c]] : null; };
+  for (let c = 0; c < 2; c++) for (let k = 0; k < 4; k++) {
+    const a = at(c, k); if (!a) continue;
+    let b = null;
+    if (route === 1) b = at(1 - c, k);
+    if (route === 2) b = at(c, k + 1);
+    if (route === 3) b = at(1 - c, k + 1);
+    if (b) { g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+  }
+  g.setLineDash([]);
+  const t = nowMs() / 1000, frozen = (P.hd_freeze | 0) === 1, live = P.hd_mix > 0 || frozen;
+  heads.forEach((q, i) => {
+    const x = X(q.t), y = lane[q.c];
+    g.strokeStyle = COL.grease; g.fillStyle = COL.grease; g.lineWidth = 1.6;
+    if (q.rev) {                                                  /* reading backwards: an arrow pointing back */
+      g.beginPath(); g.moveTo(x + 5, y - 6); g.lineTo(x - 4, y); g.lineTo(x + 5, y + 6); g.stroke();
+    } else { g.beginPath(); g.arc(x, y, 4, 0, Math.PI * 2); g.fill(); }
+    if (live && !reduceMotion) {
+      const ph = ((t / Math.max(0.05, q.t)) + i * 0.13) % 1;
+      g.globalAlpha = 0.7 * (1 - ph); g.beginPath(); g.arc(x, y, 5 + ph * 16, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1;
+    }
+    g.fillStyle = COL.dim; g.font = "600 9px " + fnt; g.textBaseline = "alphabetic";
+    g.fillText(String(q.k + 1) + (q.c ? "R" : "L"), x - 6, y - 10);
+  });
+  g.fillStyle = COL.silk; g.font = "700 11px " + fnt; g.textBaseline = "alphabetic";
+  const label = D.hd_time.options[P.hd_time | 0] + " at " + Math.round(bpmNow()) + " BPM" + (frozen ? ", frozen" : "");
+  g.fillText(label, 10, 14);
+  document.getElementById("headsState").textContent = frozen ? "frozen: the tape loops what it holds"
+    : P.hd_mix > 0 ? D.hd_route.options[route] + " routing, " + D.hd_mode.options[P.hd_mode | 0].toLowerCase() + " mode" : "off: turn Mix up";
+}
+
+/* ============================================================== readouts */
+function setRO(id, v, tag) {
+  const el = document.getElementById(id);
+  const html = tag ? v + '<span class="t">' + tag + "</span>" : v;
+  if (el._h !== html) { el._h = html; el.innerHTML = html; }
+}
+function updateReadouts() {
+  if (mode === "chain") return;
+  const fr = reelFrames(), sr = L.sr || SR0;
+  if (fr > 1) {
+    const s = selected();
+    setRO("roSplice", (s.i + 1) + " of " + s.n);
+    setRO("roLen", fmtMs((s.hi - s.lo) / sr * 1000));
+  } else { setRO("roSplice", mode === "chain" ? "Organize " + pct(P.organize) : "–"); setRO("roLen", "–"); }
+  let ms, dens, ff;
+  if (mode === "solo" && gotData) { ms = L.gms; dens = L.dens; ff = L.ff; }
+  else if (mode === "demo" || fr > 1) {
+    const s = selected(), geo = geneGeometry(s.hi - s.lo);
+    ms = geo.len / geo.sr * 1000; dens = geo.sr / geo.spacing; ff = ms / 1000 * dens;
+  }
+  if (ms === undefined || !(ms > 0)) { setRO("roGene", "–"); setRO("roDens", "–"); setRO("roFill", "–"); return; }
+  const t = cloudTag(ms, dens, ff);
+  setRO("roGene", fmtMs(ms), t.gene);
+  setRO("roDens", (dens >= 100 ? Math.round(dens) : dens.toFixed(1)) + " /s", t.dens);
+  setRO("roFill", ff.toFixed(2), t.fill);
+}
+function updateTransport() {
+  const play = document.getElementById("bPlay"), rec = document.getElementById("bRec"), recN = document.getElementById("bRecNew");
+  play.setAttribute("aria-pressed", L.run ? "true" : "false");
+  rec.setAttribute("aria-pressed", L.rec === 2 ? "true" : "false");
+  recN.setAttribute("aria-pressed", L.rec === 1 ? "true" : "false");
+  rec.classList.toggle("armed", !!L.arm && L.rec !== 2);
+  document.getElementById("mIn").style.width = Math.round(clamp(L.inp, 0, 1) * 100) + "%";
+  document.getElementById("mOut").style.width = Math.round(clamp(L.out, 0, 1) * 100) + "%";
+}
+
+/* ============================================================ mode & UI */
+function setWhere() {
+  const el = document.getElementById("where"), t = document.getElementById("whereTxt");
+  if (mode === "demo") { el.dataset.state = "demo"; t.textContent = "Demo, not connected to a Move"; return; }
+  el.dataset.state = gotData ? "live" : "wait";
+  const comp = prefix.replace(/:$/, "");
+  const where = mode === "solo" ? "Heimat Solo" : (comp === "synth" ? "Track slot" : comp);
+  t.textContent = gotData ? where + ", live" : "Waiting for " + where;
+}
+function setMode() {
+  const solo = mode !== "chain";
+  document.querySelectorAll(".solo-only").forEach((n) => { if (solo) n.removeAttribute("data-off"); else n.setAttribute("data-off", ""); });
+  document.querySelectorAll(".solo-only").forEach((n) => { if (n.classList.contains("panel")) n.hidden = !solo; });
+  document.getElementById("transport").hidden = !solo;
+  document.getElementById("reelBox").hidden = !solo;
+  document.getElementById("readouts").hidden = !solo;
+  document.querySelector(".meters").style.visibility = solo ? "" : "hidden";
+  document.getElementById("chainNote").hidden = solo;
+  document.getElementById("hintL").textContent = mode === "chain"
+    ? "Every control follows the Move as you turn it, and the Move follows the browser."
+    : "Click a splice to select it. Drag a marker to move it, double-click to add or remove one.";
+  document.getElementById("foot").textContent = mode === "chain"
+    ? "Recording, markers and the reel view are in Heimat Solo. Effects from Schwung can follow Heimat in the slot's FX positions."
+    : mode === "solo"
+      ? "Changes go straight to the Move and the Move's own screen follows them. Schwung's Master FX processes Heimat Solo with the rest of the Move."
+      : "This is a demo with a made-up reel. On the Move, open schwung-manager at move.local:7700, then Remote UI: Heimat in a track slot shows its editor there, Heimat Solo under the Tool tab.";
+  setWhere();
+  markDirty("*");
+}
+
+let toastT = 0;
+function toast(s) {
+  const el = document.getElementById("toast");
+  el.textContent = s; el.classList.add("on");
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("on"), 1600);
+}
+
+document.getElementById("bPlay").addEventListener("click", () => { act("play_latch", L.run ? 0 : 1); L.run = L.run ? 0 : 1; updateTransport(); });
+document.getElementById("bRec").addEventListener("click", () => act("rec_toggle", 1));
+document.getElementById("bRecNew").addEventListener("click", () => act("rec_toggle_new", 1));
+document.getElementById("bUndo").addEventListener("click", () => { act("undo", 1); toast("Undo"); });
+document.getElementById("bSave").addEventListener("click", () => { act("save_reel", "auto"); toast("Saving the reel"); });
+document.getElementById("aHdClear").addEventListener("click", () => { act("hd_clear", 1); toast("Heads cleared"); });
+document.getElementById("aDetect").addEventListener("click", () => { act("detect_markers", "0.50"); toast("Listening for hits"); });
+document.getElementById("aDivide").addEventListener("click", () => { act("markers_divide", Math.round(P.divide)); toast("Divided into " + Math.round(P.divide)); });
+(function () {
+  const b = document.getElementById("aClear");
+  let t = 0;
+  b.addEventListener("click", () => {
+    if (!b.hasAttribute("data-confirm")) {
+      b.setAttribute("data-confirm", ""); b.textContent = "Click again to clear";
+      t = setTimeout(() => { b.removeAttribute("data-confirm"); b.textContent = "Clear markers"; }, 2500);
+      return;
+    }
+    clearTimeout(t); b.removeAttribute("data-confirm"); b.textContent = "Clear markers";
+    act("markers_clear", 1); toast("Markers cleared");
+  });
+})();
+
+/* ================================================================= demo */
+const Demo = (function () {
+  const sr = SR0, fr = sr * 11;
+  const onsets = [0, 1.3, 2.4, 3.9, 5.1, 6.0, 7.6, 8.8, 10.1];
+  let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const genes = [];
+  let spawnIn = 0, last = 0;
+  function build() {
+    L.fr = fr; L.sr = sr; L.run = 1; L.bpm = 120;
+    L.mk = onsets.slice(1, -1).map((s) => Math.round(s * sr));
+    const n = 256; L.pkMax = new Float32Array(n); L.pkMin = new Float32Array(n);
+    for (let c = 0; c < n; c++) {
+      const t = (c + 0.5) / n * fr / sr;
+      let e = 0.02;
+      onsets.forEach((o, i) => { if (t >= o) e = Math.max(e, (0.35 + 0.55 * ((i * 37) % 10) / 10) * Math.exp(-(t - o) * (1.2 + (i % 3)))); });
+      const tex = 0.75 + 0.25 * Math.sin(c * 1.7) * Math.sin(c * 0.31);
+      L.pkMax[c] = clamp(e * tex + rnd() * 0.04, 0, 1);
+      L.pkMin[c] = -clamp(e * tex * (0.85 + rnd() * 0.15), 0, 1);
+    }
+  }
+  function tick(t) {
+    const dt = Math.min(0.05, (t - (last || t)) / 1000); last = t;
+    const b = bounds();
+    if (!L.run) { genes.length = 0; L.gp = []; L.out *= 0.9; return; }
+    const sel = clamp(Math.min(b.length - 2, Math.floor(P.organize * (b.length - 1))), 0, b.length - 2);
+    L.sel = L.pinned !== undefined ? L.pinned : sel;
+    const s = selected(), span = s.hi - s.lo, geo = geneGeometry(span);
+    const spd = speedRatio(P.vari_speed); L.spd = spd;
+    spawnIn -= dt * sr;
+    while (spawnIn <= 0 && genes.length < 64) {
+      const jitter = (rnd() - 0.5) * P.scatter;
+      const start = s.lo + clamp(P.slide + jitter * 0.5 * (P.gene_size > 0.005 ? 1 : 0), 0, 0.999) * span;
+      genes.push({ p: start, left: geo.len, lo: s.lo, span, dir: rnd() < P.gene_reverse ? -1 : 1 });
+      spawnIn += geo.spacing * (1 + jitter * 0.9);
+    }
+    for (let i = genes.length - 1; i >= 0; i--) {
+      const g = genes[i];
+      g.p = g.lo + ((((g.p - g.lo) + spd * g.dir * sr * dt) % g.span) + g.span) % g.span;
+      g.left -= sr * dt;
+      if (g.left <= 0) genes.splice(i, 1);
+    }
+    L.gp = genes.slice(0, 16).map((g) => g.p);
+    L.out = clamp(0.25 + 0.4 * P.volume * Math.min(1, genes.length / 2) + rnd() * 0.08, 0, 1) * (spd === 0 ? 0.1 : 1);
+    L.inp = 0.05 + rnd() * 0.05;
+  }
+  return {
+    build, tick,
+    onParam(k) { if (k === "organize") L.pinned = undefined; },
+    act(k, v) {
+      if (k === "sel_splice") L.pinned = +v;
+      else if (k === "play_latch") L.run = +v;
+      else if (k === "marker_move") { const [i, f] = String(v).split(",").map(Number); L.mk[i] = f; L.mk.sort((a, b) => a - b); }
+      else if (k === "marker_add") { L.mk.push(+v); L.mk.sort((a, b) => a - b); }
+      else if (k === "marker_del") L.mk.splice(+v, 1);
+      else if (k === "markers_clear") L.mk = [];
+      else if (k === "markers_divide") { const n = +v; L.mk = []; for (let i = 1; i < n; i++) L.mk.push(Math.round(fr * i / n)); }
+      else if (k === "rec_toggle" || k === "rec_toggle_new") toast("Recording needs the Move");
+      else if (k === "save_reel") { toast("Saving needs the Move"); return; }
+      else if (k === "hd_clear") return;
+      else if (k === "detect_markers") { L.mk = onsets.slice(1, -1).map((s) => Math.round(s * sr)); }
+      markDirty("*");
+    },
+  };
+})();
+
+/* ============================================================ main loop */
+function frame(t) {
+  if (mode === "demo") Demo.tick(t);
+  const all = dirty.has("*");
+  if (dirty.size) {
+    for (const k in ctl) if (all || dirty.has(k) || k === "gene_size" || k === "dly_time") ctl[k].update();
+    drawTrain(); drawEq(); drawDly(); drawRev();
+    dirty.clear();
+  }
+  drawHeadsCv();
+  drawReel();
+  updateReadouts();
+  updateTransport();
+  requestAnimationFrame(frame);
+}
+window.addEventListener("resize", () => markDirty("*"));
+
+/* the reel, seen from above: an Archimedean spiral of tape round a hub */
+(function () {
+  const svg = document.getElementById("spiralSvg");
+  let d = "";
+  for (let i = 0; i <= 720; i++) {
+    const th = i / 720 * Math.PI * 2 * 6.5, r = 9 + th * 1.0;
+    const x = r * Math.cos(th), y = r * Math.sin(th);
+    d += (i ? "L" : "M") + x.toFixed(2) + " " + y.toFixed(2);
+  }
+  svg.innerHTML = '<defs><linearGradient id="spg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff3d9a"/>' +
+    '<stop offset=".5" stop-color="#ff9a1f"/><stop offset="1" stop-color="#d4ff3a"/></linearGradient></defs>' +
+    '<path d="' + d + '" fill="none" stroke="url(#spg)" stroke-width="2.2"/>' +
+    '<circle r="7" fill="none" stroke="#efe6d2" stroke-width="2"/><circle r="2" fill="#efe6d2"/>';
+})();
+
+setMode();
+if (mode === "demo") { Demo.build(); gotData = true; setWhere(); }
+else {
+  RT.onParamChange(onParams);
+  /* the Tool tab pushes new snapshots by itself; ask again if none arrived */
+  setTimeout(() => { if (!gotData && RT.resubscribe && mode === "solo") RT.resubscribe(); }, 1500);
+}
+/* exposed for tests */
+window.heimatEditor = { P, L, get mode() { return mode; }, onParams, send };
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

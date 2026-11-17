@@ -1,0 +1,111 @@
+{
+  "title": "Heimat",
+  "children": [
+    {
+      "title": "Overview",
+      "lines": [
+        "Tape and microsound",
+        "sample player.",
+        "",
+        "Load a WAV from the",
+        "Reel page. Markers",
+        "in the file (like",
+        "other samplers)",
+        "become splices."
+      ]
+    },
+    {
+      "title": "Main knobs",
+      "lines": [
+        "Gene-Size: 0 plays",
+        " the whole splice.",
+        "Slide: start point.",
+        "Morph: gaps, loop,",
+        " overlaps, chords.",
+        "Vari-Speed: centre",
+        " stops; +-0.5 is the",
+        " original speed.",
+        "Organize: splice."
+      ]
+    },
+    {
+      "title": "Pad Mode",
+      "lines": [
+        "Pitch: notes set the",
+        " speed (1 V/oct from",
+        " the root note); the",
+        " key is Play gate.",
+        "Splice: one pad per",
+        " splice.",
+        "Drone: plays on its",
+        " own; pads retrigger."
+      ]
+    },
+    {
+      "title": "Play Gate",
+      "lines": [
+        "Classic: the gene in",
+        " progress finishes.",
+        "Momentary: stops at",
+        " key release.",
+        "Trigger Loop: pads",
+        " restart, never stop."
+      ]
+    },
+    {
+      "title": "Micro",
+      "lines": [
+        "Env: gene envelope",
+        "(Edge, Tukey, Gauss,",
+        "Triangle, Expodec,",
+        "Rexpodec).",
+        "Scatter: irregular",
+        "timing and position.",
+        "Spread: random pitch",
+        "per gene, semitones.",
+        "Intervals: free, or",
+        "semitones, octaves,",
+        "fifths, major, minor.",
+        "Reverse: chance a",
+        "gene plays backwards.",
+        "Width: random pan.",
+        "Thr/Sel: play only",
+        "loud or quiet genes."
+      ]
+    },
+    {
+      "title": "Effects",
+      "lines": [
+        "EQ: Low, Mid (with",
+        "Freq) and High,",
+        "+-15 dB.",
+        "Delay: Time or Sync",
+        "to the tempo, Fdbk,",
+        "Tone, Ping-Pong, Mix",
+        "Reverb: Decay, Damp,",
+        "Mix.",
+        "All off by default.",
+        "The chain's own FX",
+        "slots work too."
+      ]
+    },
+    {
+      "title": "Heads",
+      "lines": [
+        "A tape loop with up",
+        "to 4 heads per side.",
+        "Time: note value.",
+        "Spacing spreads them",
+        "Reverse: heads read",
+        "backwards.",
+        "Wear: what each pass",
+        "does to the sound.",
+        "Mode: Fade, Glide,",
+        "Rise, Fall.",
+        "Routing: Own, Cross,",
+        "Chain, Wander.",
+        "Freeze loops it."
+      ]
+    }
+  ]
+}

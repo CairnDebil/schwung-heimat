@@ -1,0 +1,8 @@
+build/
+dist/
+*.tar.gz
+tests/render_test
+tests/screens/ops.json
+.DS_Store
+*.dSYM/
+node_modules/

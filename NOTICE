@@ -1,0 +1,8 @@
+Heimat is an original, open-source instrument (MIT License). It contains no
+code, samples or data from any commercial instrument.
+
+src/dsp/plugin_api_v1.h is the Schwung plugin ABI header, and
+tests/vendor/constants.mjs and tests/vendor/input_filter.mjs are copies of
+Schwung's shared UI files (used only by the offline UI test). They are copied
+unchanged from the Schwung repository (MIT License,
+Copyright (c) 2025-2026 Charles Vestal).

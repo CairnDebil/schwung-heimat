@@ -1,0 +1,86 @@
+name: Beta report
+description: Something you found while testing Heimat on a Move (BETA.md)
+title: "[beta] "
+labels: ["beta"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing. The sheet is in [BETA.md](../blob/main/BETA.md) (Italian: [BETA.it.md](../blob/main/BETA.it.md)).
+        You can write in English or Italian.
+  - type: input
+    id: heimat
+    attributes:
+      label: Heimat version
+      description: Heimat Solo → Menu → About / DSP load
+      placeholder: 0.7.0
+    validations:
+      required: true
+  - type: input
+    id: schwung
+    attributes:
+      label: Schwung version and Move firmware
+      placeholder: Schwung 1.9.x, Move 1.x
+    validations:
+      required: true
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module
+      options:
+        - Heimat Solo
+        - Heimat in a track slot
+        - Both
+        - Browser editor
+    validations:
+      required: true
+  - type: dropdown
+    id: section
+    attributes:
+      label: Section of the test sheet
+      options:
+        - 1. Loading and playing
+        - 2. Recording
+        - 3. Genes and Micro
+        - 4. Effects and HEADS
+        - 5. Load
+        - 6. Track slot
+        - 7. Browser editor
+        - 8. Long run and leaving
+        - Something else
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of problem
+      options:
+        - Click, gap or dropout
+        - Crash or freeze
+        - Wrong sound or behaviour
+        - Settings or files not kept
+        - Screen, LEDs or controls
+        - A suggestion
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What you did, what happened, what you expected
+      placeholder: |
+        1. Loaded a 24-bit stereo WAV while a reel was playing
+        2. ...
+        Happened: ...
+        Expected: ...
+    validations:
+      required: true
+  - type: input
+    id: load
+    attributes:
+      label: About / DSP load at that moment (DSP, PEAK, OVER)
+      placeholder: DSP 14%  PEAK 38%  OVER 0
+  - type: textarea
+    id: files
+    attributes:
+      label: Files
+      description: Drag in /data/UserData/schwung/heimat/state.json for settings problems, the WAV for sample problems, a photo or video of the screen if it helps.

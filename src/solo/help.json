@@ -1,0 +1,156 @@
+{
+  "title": "Heimat Solo",
+  "children": [
+    {
+      "title": "Pages",
+      "lines": [
+        "Track 1: PLAY",
+        "Track 2: REEL (edit)",
+        "Track 3: REC / CLOCK",
+        "Track 4: MICRO, FX,",
+        "FX 2, HEADS, HEADS 2",
+        "SETUP 1 and 2.",
+        "Shift+Track 3: HEADS",
+        "Shift+Track 4: FX",
+        "Turn or touch: name",
+        "and value show below",
+        "Shift+Back: exit."
+      ]
+    },
+    {
+      "title": "Micro",
+      "lines": [
+        "Env: gene envelope.",
+        "Scatter: genes leave",
+        "the grid, start",
+        "points wander.",
+        "Spread: pitch band.",
+        "INTV: free pitch or",
+        "intervals (semi, oct,",
+        "5th, major, minor).",
+        "GREV: chance a gene",
+        "plays backwards.",
+        "Width: stereo cloud.",
+        "Thr/Sel: keep only",
+        "loud or quiet genes.",
+        "Top right: gene ms,",
+        "genes per second,",
+        "fill factor."
+      ]
+    },
+    {
+      "title": "Effects",
+      "lines": [
+        "Track 4 twice, or",
+        "Shift+Track 4: FX.",
+        "EQ Low/Mid/Freq/High",
+        "Delay Time/Fdbk/Mix,",
+        "Reverb Mix.",
+        "Track 4 again: FX 2,",
+        "Sync, Tone, Ping,",
+        "Decay, Damp, RFX.",
+        "RFX on: recordings",
+        "go through the FX.",
+        "Master FX works too."
+      ]
+    },
+    {
+      "title": "Heads",
+      "lines": [
+        "Shift+Track 3: HEADS",
+        "A tape loop with up",
+        "to 4 heads per side.",
+        "TIME note value,",
+        "HEAD heads per side,",
+        "SPAC spread them,",
+        "REV read backwards.",
+        "HEADS 2: WEAR (Dark",
+        "Thin Crush Warm Fold",
+        "Fuzz), MODE (Fade",
+        "Glide Rise Fall),",
+        "ROUT (Own Cross",
+        "Chain Wander).",
+        "FRZ loops the tape.",
+        "Menu: Clear heads."
+      ]
+    },
+    {
+      "title": "Record",
+      "lines": [
+        "Rec: record over the",
+        "splice (TLA).",
+        "Shift+Rec or Sample:",
+        "record a new splice.",
+        "SOS: input vs reel.",
+        "Source Mix records",
+        "what you hear;",
+        "Input only the input.",
+        "Sync: start and stop",
+        "on the next tick."
+      ]
+    },
+    {
+      "title": "Splices",
+      "lines": [
+        "Capture: marker at",
+        "the playhead (PLAY)",
+        "or cursor (REEL).",
+        "Jog moves the cursor",
+        "in REEL; click adds.",
+        "Delete: remove one.",
+        "Hold Delete: clear.",
+        "Shift+hold: new reel",
+        "Copy: auto-splice.",
+        "Undo undoes edits."
+      ]
+    },
+    {
+      "title": "Pads and steps",
+      "lines": [
+        "Steps 1-16: pick a",
+        "splice.",
+        "Pads follow Pad Mode",
+        "(PITCH/SPLICE/DRONE)",
+        "On REEL a pad plays",
+        "its splice.",
+        "Left/Right: splice.",
+        "Up/Down: octave or",
+        "splice bank."
+      ]
+    },
+    {
+      "title": "Clock",
+      "lines": [
+        "Loop: clock on/off.",
+        "Shift+Loop: source",
+        "(Internal/Move/MIDI)",
+        "Gene Shift steps the",
+        "genes on each tick;",
+        "Time Stretch glides",
+        "through the splice."
+      ]
+    },
+    {
+      "title": "Files",
+      "lines": [
+        "Menu: load a WAV,",
+        "new empty reel, save",
+        "auto-splice, clear.",
+        "Reels are saved to",
+        "Samples/Heimat with",
+        "their markers."
+      ]
+    },
+    {
+      "title": "Beta",
+      "lines": [
+        "Menu > About / DSP",
+        "load: version, load",
+        "(DSP avg, PEAK) and",
+        "OVER = late blocks.",
+        "OVER above 0: please",
+        "report it."
+      ]
+    }
+  ]
+}
