@@ -1,21 +1,21 @@
 {
-  "id": "heimat",
+  "id": "heimat-solo",
   "name": "Heimat",
-  "abbrev": "HM",
-  "version": "0.7.0",
-  "description": "Tape and microsound sample player: reels, splices and genes with envelope shapes, scatter, pitch spread, markers and clock sync",
-  "author": "TUO NOME",
+  "abbrev": "HMT",
+  "version": "0.12.0",
+  "min_host_version": "1.7.3",
+  "description": "Tape and microsound instrument: record, splice by hand, granulate with envelopes, scatter and spread, tape heads and reverb, clock sync and reel saving",
+  "author": "CairnDebil",
   "license": "MIT",
+  "component_type": "overtake",
   "ui": "ui.js",
   "dsp": "dsp.so",
   "api_version": 2,
   "capabilities": {
+    "audio_in": true,
     "audio_out": true,
-    "audio_in": false,
     "midi_in": true,
-    "midi_out": false,
     "aftertouch": false,
-    "chainable": true,
-    "component_type": "sound_generator"
+    "component_type": "overtake"
   }
 }

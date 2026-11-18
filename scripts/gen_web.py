@@ -21,17 +21,23 @@ DEMO = os.path.join(ROOT, 'docs', 'editor.html')
 # which section of the manual / editor each parameter belongs to
 GROUPS = [
     ('Genes', ['gene_size', 'slide', 'morph', 'vari_speed', 'organize', 'organize_mode']),
-    ('Micro', ['gene_window', 'scatter', 'spread', 'spread_mode', 'gene_reverse', 'width', 'threshold', 'thr_mode']),
-    ('Effects', ['eq_low', 'eq_mid', 'eq_freq', 'eq_high', 'dly_time', 'dly_sync', 'dly_fdbk', 'dly_tone',
-                 'dly_mix', 'dly_ping', 'rev_decay', 'rev_damp', 'rev_mix', 'fx_rec']),
+    ('Micro', ['gene_window', 'scatter', 'spread', 'spread_mode', 'gene_reverse', 'width', 'threshold', 'thr_mode',
+               'pattern', 'pattern_seed']),
+    ('EQ', ['eq_low', 'eq_mid', 'eq_freq', 'eq_high']),
     ('Heads', ['hd_mix', 'hd_time', 'hd_heads', 'hd_spacing', 'hd_fdbk', 'hd_reverse', 'hd_wear', 'hd_wear_amt',
                'hd_mode', 'hd_route', 'hd_freeze']),
+    ('Reverb', ['rev_mix', 'rev_size', 'rev_predelay', 'rev_reverse', 'rev_decay', 'rev_damp', 'rev_tilt',
+                'rev_depth', 'rev_speed']),
+    ('Modulators', ['mod_wave_shape', 'mod_wave_rate', 'mod_wave_sync', 'mod_wave_retrig',
+                    'mod_rand_rate', 'mod_rand_smooth', 'mod_rand_sync', 'mod_rand_retrig',
+                    'mod_follow_src', 'mod_follow_gain', 'mod_follow_attack', 'mod_follow_release',
+                    'mod_env_attack', 'mod_env_decay', 'mod_env_mode', 'mod_env_trigger']),
     ('Play', ['pad_mode', 'play_mode', 'release_ms', 'root_note', 'octave_transpose', 'bend_range', 'volume', 'mute']),
     ('Splices and chords', ['splice_source', 'divide', 'splice_base', 'mcr1', 'mcr2', 'mcr3']),
-    ('Recording', ['sos', 'in_gain', 'rec_source', 'rec_sync', 'save_48k']),
+    ('Recording', ['sos', 'in_gain', 'rec_source', 'rec_sync', 'rec_length', 'rec_after', 'rec_head', 'rec_trim',
+                   'fx_rec', 'save_48k']),
     ('Clock', ['clock_source', 'clock_div', 'clock_mode', 'bpm']),
 ]
-SOLO_ONLY = {'sos', 'in_gain', 'rec_source', 'rec_sync', 'save_48k', 'fx_rec'}
 
 
 def num(s):
@@ -69,8 +75,6 @@ def parse():
     group_of = {k: g for g, ks in GROUPS for k in ks}
     for p in out:
         p['group'] = group_of.get(p['key'], 'Other')
-        if p['key'] in SOLO_ONLY:
-            p['solo'] = True
     return out
 
 
@@ -90,9 +94,8 @@ def ref_table(params):
             else:
                 rng = '%s to %s' % (fmt_num(p['min']), fmt_num(p['max']))
                 d = fmt_num(p['default'])
-            solo = ' <span class="solo-tag">Solo</span>' if p.get('solo') else ''
-            rows.append('<tr><td>%s%s</td><td><code>%s</code></td><td>%s</td><td>%s</td></tr>'
-                        % (html.escape(p['name']), solo, html.escape(k), rng, d))
+            rows.append('<tr><td>%s</td><td><code>%s</code></td><td>%s</td><td>%s</td></tr>'
+                        % (html.escape(p['name']), html.escape(k), rng, d))
     return '\n'.join(rows)
 
 

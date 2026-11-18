@@ -40,7 +40,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: heimat-modules
-          path: |
-            dist/heimat-module.tar.gz
-            dist/heimat-solo-module.tar.gz
+          name: heimat
+          path: dist/heimat-solo-module.tar.gz

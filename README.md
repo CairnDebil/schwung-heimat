@@ -12,12 +12,15 @@ seconds), the sound object, and the micro scale of grains a few milliseconds lon
 editor demo online* below). **Browser editor:** every parameter, the reel and
 the genes live in schwung-manager's Remote UI.
 
-One engine (`src/dsp/heimat.c`), two modules:
+Heimat is an overtake module: a standalone instrument with its own screen and
+pages that takes over the whole Move surface. It records from the Move input,
+lets you place splice markers by hand, follows a clock and saves reels.
 
-| Module | Type | What it is |
-|---|---|---|
-| **Heimat** | sound generator | Sits in a Signal Chain slot like any synth and plays WAV reels. |
-| **Heimat Solo** | overtake | A standalone instrument with its own screen and pages that takes over the whole Move surface: records from the Move input, lets you place splice markers by hand, follows a clock and saves reels. |
+Up to 0.8 it was called *Heimat Solo*, and the same engine also built a second
+module, *Heimat*, for a Signal Chain slot. From 0.9 the track module is
+suspended (its sources and how to bring it back are in `attic/track-module`)
+and the instrument is simply Heimat. It keeps its module id `heimat-solo`, so
+it installs over Heimat Solo and keeps your settings and reels.
 
 ## The engine
 
@@ -29,8 +32,11 @@ One engine (`src/dsp/heimat.c`), two modules:
   automatically, or markers placed by hand. Undo covers marker edits and
   new-splice recordings.
 * **Genes**:
-  * **Gene-Size** — 0 plays the whole splice; turning up shrinks the gene down to
-    half a millisecond. It is a time, so it does not change with speed.
+  * **Gene-Size** — 0 plays the whole splice; turning up shrinks the gene from
+    the splice (at most 4 s) down to half a millisecond. The first half of the
+    knob covers genes you hear as sounds (down to about 130 ms), the second
+    half the grains (10 ms at three quarters). It is a time, so it does not
+    change with speed.
   * **Slide** — where in the splice the genes start.
   * **Morph** — the overlap of successive genes: gaps of silence, then a seamless
     1/1 loop, then up to three overlapping genes, then a fourth with random
@@ -60,22 +66,36 @@ One engine (`src/dsp/heimat.c`), two modules:
     every gene follows Vari-Speed, at 50% forwards and backwards mix evenly, at
     100% all of them run the other way. It is decided when a gene starts.
   * **Width** — a random stereo position for each gene.
+  * **Pattern** + **Pattern Seed** (new in 0.10) — repeatable chance. With
+    Pattern on, the random choices of each gene (Scatter, Spread, Gene Reverse,
+    Width, the spacing, the Morph chord tones) repeat every 2 to 32 genes, so a
+    cloud turns into a phrase that comes round again; the Seed (1 – 999) picks
+    another phrase. Each new attack starts the phrase from its first gene. Off,
+    chance runs free as before.
   * **Selective** + **Threshold** — play only the genes that are louder (*Loud*) or
     quieter (*Quiet*) than the threshold; the skipped genes keep their place in
     time as silence.
-* **Effects** (new in 0.4, all off at their defaults): a three-band **EQ** (low
-  shelf at 180 Hz, a mid band you can tune from 100 Hz to 8 kHz, high shelf at
-  5 kHz, ±15 dB each), a stereo **Delay** (10 ms – 2 s, or synced to the tempo
-  from 1/16 to 1/2 note; feedback with a tone control, optional ping-pong; the
-  time glides when changed, like a tape echo) and a **Reverb** (diffused
-  feedback-delay network, decay 0.3 – 12 s, damping). They run in series
-  after the playback / input mix and before the volume. With *Record Through FX*
-  (Solo) the effects are printed into what you record, which turns
+* **Modulators** (new in 0.11): four sources that move any continuous control
+  on top of where its knob stands. *Wave* (sine, triangle, ramp up, ramp down,
+  square; 0.02 – 20 Hz, or synced from 4 bars to 1/16, optionally restarted by
+  the pads), *Random* (a new value each step, stepped or gliding, free or
+  synced, optionally a new value on each pad), *Follow* (the level of the input
+  or of Heimat's output, with gain, rise and fall) and *Envelope* (attack and
+  decay, or held while a pad is down, or looping; started by the pads, the
+  clock or both). Up to 16 routes, each with a depth from -100% to +100% of the
+  control's range. The knob itself never moves: what you set is what is saved,
+  and the routes are saved with the session (`mod_routes`).
+* **Effects** (all off at their defaults): a three-band **EQ** (low shelf at
+  180 Hz, a mid band you can tune from 100 Hz to 8 kHz, high shelf at 5 kHz,
+  ±15 dB each), the **Heads** (below) and a **Reverb** (new in 0.8, below). They
+  run in series, EQ → Heads → Reverb, after the playback / input mix and before
+  the volume. With *Record Through FX*
+  the effects are printed into what you record, which turns
   Sound-on-Sound into an echo and reverb accumulator; otherwise recordings stay
   dry and the effects are only in the output. A flat EQ and a mix at zero cost no
   CPU.
 * **Heads** (new in 0.6, off at its default): a loop of tape with up to four
-  playback heads per side, between the delay and the reverb. *Time* is a note
+  playback heads per side, between the EQ and the reverb. *Time* is a note
   value from two bars to 1/128 at Heimat's tempo; *Heads* sets one to four per
   side; *Spacing* spreads them from a tight, strummed cluster to wide intervals
   (and detunes right against left); *Feedback* goes from one repeat to endless;
@@ -89,15 +109,48 @@ One engine (`src/dsp/heimat.c`), two modules:
   *Freeze* loops what is on the tape; *Clear heads* silences it at once (it
   marks the tape as erased instead of wiping memory on the audio thread). Each
   head has 11.9 s of tape; head times stop at 5.9 s, so that backwards heads
-  have room. Solo: the HEADS and HEADS 2 pages (Shift + Track 3), *Clear heads*
-  in the menu; chain module: the *Heads* page.
-* **Input through the effects** (Solo, 0.6): with an empty reel the input and
+  have room. The HEADS and HEADS 2 pages (Shift + Track 3), *Clear heads* in the
+  menu.
+* **Reverb** (new in 0.8, off at its default): *Size* from a box to a sky on
+  one knob (every distance scales at once, so turning it glides between spaces;
+  bigger spaces ring longer at the same Decay); *Pre-Delay* 7 – 500 ms,
+  independent of Size, with *Reverse* playing it backwards in pieces of its own
+  length; *Decay* from about 0.1 s to a minute, holding forever at the top;
+  *Absorb* first adds diffusion, then damping inside the loop; *Depth* and
+  *Speed* move the space from within: to the left a chorus of eight phases, to
+  the right each line wanders on its own, at the far right an octave above the
+  tail is fed back in (shimmer), 0.05 – 200 Hz; *Tilt* sets the tone after
+  everything, from dark to bright. An eight-line feedback delay network with
+  four diffusers, designed for Heimat.
+* **Input through the effects** (0.6): with an empty reel the input and
   the effect tails now go on through the effects, so you can play into Heimat
-  Solo before recording anything (with Sound on Sound below the top).
-* **Recording** (Solo): *into a new splice* at the end of the reel, or *over the
+  Heimat before recording anything (with Sound on Sound below the top).
+* **Recording**: *into a new splice* at the end of the reel, or *over the
   current splice* (time-lag accumulation: the write point wraps round the splice).
   The source is the Sound-on-Sound mix of input and playback, or the input only,
-  with four input gain steps. Recording is independent of playback speed.
+  with four input gain steps.
+* **Looper tape** (new in 0.10, LOOP page): *Record Length* stops a new-splice
+  recording by itself after 1, 2, 4, 8 or 16 bars at Heimat's tempo (Free:
+  when you stop it). *After Recording*: *Play* the new splice, or *Overdub* —
+  recording goes straight on over the loop just closed, until you stop it (this
+  also holds when you stop a free-length recording yourself). *Overdub Head*:
+  *Steady* writes at the speed of time, independent of playback; *Vari-Speed*
+  runs the write head with the tape, so an overdub at half speed comes back an
+  octave up, a backwards one plays forwards, and with the tape stopped nothing
+  is written.
+* **Trimming** (new in 0.12): *Trim splice* (Menu, or Shift + Capture) keeps
+  only part of the selected splice: knob 1 moves the start, knob 2 the end,
+  knob 3 zooms on the last point moved, the jog nudges it. While you trim, the
+  genes play only what will stay. Jog click or Capture cuts (with a short fade
+  at each cut), Back leaves everything as it was, Undo brings the cut back. The
+  rest of the reel moves up and its markers with it; in Divide mode the
+  divisions become markers.
+* **Trim Key Noise** (new in 0.12, LOOP page): the click of the buttons you
+  press to start and stop is not kept. 50 – 500 ms at the start of a recording
+  are skipped and the same at the end are taken off a new splice; on an
+  overdub, the last ones get back what was there before. Only when you press:
+  a start or stop on a clock tick (Record Sync) or at the end of a Record
+  Length is left alone.
 * **Clock**: internal BPM, Move's transport, or MIDI clock, divided from 1/16 to a
   bar. A tick steps to the next gene (*Gene Shift*) or makes the start point glide
   through the splice (*Time Stretch*); *Auto* uses Gene Shift up to Morph 2/1 and
@@ -105,7 +158,7 @@ One engine (`src/dsp/heimat.c`), two modules:
 * **Save**: the reel is written as a 32-bit float stereo WAV with cue markers into
   `UserLibrary/Samples/Heimat/`, at the Move rate or at 48 kHz, atomically (temp
   file, then rename).
-* **Solo remembers its settings** (and the last reel file) between sessions, in
+* **Heimat remembers its settings** (and the last reel file) between sessions, in
   `/data/UserData/schwung/heimat/state.json`, two seconds after the last change.
 
 ## Reading the cloud
@@ -125,7 +178,7 @@ by number:
 These thresholds follow Curtis Roads' observations on granular textures (see
 References); they are guides for listening, not hard limits.
 
-## Heimat Solo: the surface
+## The surface
 
 The screen is laid out like a hardware panel: the splice window (`S03/08`), two
 direction windows with the Morph state between them, and one cell per encoder
@@ -134,16 +187,20 @@ and the left / right arrows light as reverse / forward windows.
 
 | Control | Action |
 |---|---|
-| **Track 1–4** | Pages: PLAY · REEL (marker editing) · REC / CLOCK · MICRO, then FX, FX 2, HEADS, HEADS 2, SETUP 1 and SETUP 2 on further presses of Track 4 |
-| **Shift + Track 4** | Straight to the FX page |
+| **Track 1–4** | Pages: PLAY · REEL (marker editing) · REC / CLOCK (again: LOOP) · MICRO, then MICRO 2, EQ, HEADS, HEADS 2, REVERB, REVERB 2, SETUP 1 and SETUP 2 on further presses of Track 4 |
+| **Shift + Track 4** | Straight to the REVERB page (again: EQ) |
+| **Shift + Track 1** | MOD 1 (Wave, Random), again: MOD 2 (Follow, Envelope) |
+| **Hold Track 1–4 + turn a knob** | Route Wave, Random, Follow or Envelope to that knob's control: the turn sets the depth (Shift for fine steps), back to 0 removes it. Modulated cells carry a flag on their left edge. The page changes only if you let go without turning |
+| **Hold Track 1–4 + Delete** | Remove every route of that modulator |
 | **Shift + Track 3** | Straight to the HEADS page |
 | **Knobs 1–8** | The eight cells of the page. Turn or touch: name and value appear in place of the cells; Shift for fine steps |
 | **Record** | Record over the current splice; again to stop |
 | **Shift + Record**, **Sample** | Record into a new splice |
 | **Capture** | Drop a splice marker at the playhead (PLAY) or at the cursor (REEL) |
+| **Shift + Capture** | TRIM the selected splice (knob 1 start, knob 2 end, knob 3 zoom; jog click or Capture cuts, Back cancels) |
 | **Jog** | REEL: move the cursor (Shift = fine); click adds a marker. Elsewhere: choose the splice |
 | **Delete** | Tap: delete the marker under the cursor, or join the current splice with the next. Hold 1.2 s: clear all markers. Shift + hold 2 s: new empty reel |
-| **Undo** | Undo the last marker edit or new-splice recording |
+| **Undo** | Undo the last marker edit, new-splice recording or trim |
 | **Copy** | Auto-splice on transients (sensitivity on the REEL page) |
 | **Steps 1–16** | Select a splice (banks of 16 follow the selection) |
 | **Pads** | Follow Pad Mode (Pitch / Splice / Drone). On the REEL page a pad plays its splice while held |
@@ -151,8 +208,8 @@ and the left / right arrows light as reverse / forward windows.
 | **Play** | Play gate on / off |
 | **Loop** | Clock on / off. **Shift + Loop** cycles the source: Internal, Move, MIDI |
 | **Mute** | Mute the output |
-| **Menu** | Load WAV · New empty reel · Save reel · Auto-splice · Clear all markers · Undo · Clear heads · About / DSP load (version, Heimat's share of each audio block, blocks over time) |
-| **Shift + Back** | Leave Heimat Solo |
+| **Menu** | Load WAV · New empty reel · Save reel · Auto-splice · Clear all markers · Undo · Clear heads · Trim splice · About / DSP load (version, Heimat's share of each audio block, blocks over time) |
+| **Shift + Back** | Leave Heimat |
 
 REEL page knobs: **SPLC** (splice), **STRT / END** (move the markers around the
 selected splice), **ZOOM**, **SENS** (transient sensitivity), **DIV** (divide into
@@ -160,13 +217,30 @@ N equal splices, applied when you stop turning), plus Gene-Size and Slide.
 
 MICRO page knobs: **ENV**, **SCAT**, **SPRD**, **WIDE**, **THR**, **SEL**, **INTV**
 (Spread Intervals) and **GREV** (Gene Reverse); Gene-Size and Morph stay on PLAY.
-In the chain module the same controls are on the *Micro* parameter page.
+MICRO 2: **PATT** (Pattern), **SEED**, then Scatter, Spread, Intervals, Gene
+Reverse, Width and the envelope again, with one box per gene of the cycle.
 
-FX page knobs (Track 4 twice, or **Shift + Track 4**): **LOW**, **MID**, **FREQ**,
-**HIGH**, delay **TIME**, **FDBK**, **DLY** (delay mix), **REV** (reverb mix). The
-screen shows the EQ curve. FX 2 page: **SYNC**, **TONE**, **PING**, **FDBK**,
-**DCAY**, **DAMP**, **REV**, **RFX** (record through FX), with the echoes and the
-reverb decay drawn above. In the chain module these are on the *Effects* page.
+MOD 1: **SHP**, **RATE**, **SYNC**, **RST** (Wave), then **RATE**, **SMTH**,
+**SYNC**, **RST** (Random), with each source drawn as a moving trace and the
+number of controls it drives. MOD 2: **SRC**, **GAIN**, **RISE**, **FALL**
+(Follow), **ATK**, **DCY**, **MODE**, **TRIG** (Envelope).
+
+LOOP (Track 3 twice): **LEN** (Record Length), **AFTR** (After Recording),
+**HEAD** (Overdub Head), **KEYS** (Trim Key Noise), **SYNC**, **SOS**, **BPM** and **SPD**
+(Vari-Speed), with the bars filling while you record.
+
+Each effect has its own page. EQ (Track 4 three times): **LOW**, **MID**, **FREQ**,
+**HIGH**, then **MIX** (to the heads), **REV** (to the reverb), **RFX** (record
+through FX) and **VOL**, with the EQ curve. HEADS and HEADS 2 follow. REVERB
+(**Shift + Track 4**, or Track 4 six times): **REV** (mix), **SIZE**, **PRE**,
+**DCAY**, **ABSB**, **DPTH**, **SPD**, **TILT**, with the space drawn above.
+REVERB 2: **RVRS**, **PRE**, **SIZE**, **DCAY**, **ABSB**, **TILT**, **REV**,
+**RFX**.
+
+Encoders: a slow turn moves a control by 1/400 of its range per click (Shift:
+1/2000), turning fast multiplies that by up to 4; choices and small whole
+numbers move one step every two clicks, so they do not skip; BPM and notes move
+one per click.
 
 Turning or touching a knob replaces the cells at the bottom of the screen with
 that parameter's name, value and a wide bar for as long as you turn (or keep
@@ -178,14 +252,12 @@ messages and the Delete-hold confirmation use the same strip.
 Heimat's effects are built in, but you can also use the audio effects already
 installed in Schwung:
 
-* **Heimat Solo**: its output joins the Move mix before **Master FX**, so the
-  effects you load in Schwung's Master FX (up to eight in a row) process Heimat
-  too, together with the rest of the Move.
-* **Heimat** in a Signal Chain: put any Schwung audio effect in the slot's FX
-  positions after the sound generator, as with any other synth.
+Heimat's output joins the Move mix before **Master FX**, so the effects you
+load in Schwung's Master FX (up to eight in a row) process Heimat too, together
+with the rest of the Move.
 
 Heimat does not load other modules' effects inside itself. Schwung already hosts
-effects in Master FX and in the chain slots, and a module that loaded other
+effects in Master FX, and a module that loaded other
 modules' code would depend on their internals and on host details that can
 change between Schwung versions; using Schwung's own FX positions is the stable
 way.
@@ -203,21 +275,21 @@ never stops.
 
 ## Browser editor
 
-Both modules ship a `web_ui.html` that schwung-manager shows in its Remote UI
-(`http://move.local:7700`, *Remote UI*): Heimat in a track slot shows it in
-that slot's view, Heimat Solo under the **Tool** tab while it runs. The pop-out
+Heimat ships a `web_ui.html` that schwung-manager shows in its Remote UI
+(`http://move.local:7700`, *Remote UI*), under the **Tool** tab while Heimat
+runs. The pop-out
 button opens it in a window of its own, also on a phone.
 
 * Changes in the browser reach the Move at once, and knobs turned on the Move
   move in the browser.
-* Heimat Solo also sends the live view: the whole reel with its splice marks,
+* Heimat also sends the live view: the whole reel with its splice marks,
   the genes as they read, the record head, the in and out levels and the
   cloud readings (gene length, density, fill factor). Click a splice to select
   it, drag a mark to move it, double-click to add or remove one. Play, Record,
   New splice, Undo, Save, Auto-splice, Divide now and Clear markers are there
   too.
 * The EQ curve is the exact response of the three filters; drag its points.
-  The delay and reverb show their echoes and decay.
+  The reverb shows its pre-delay, first reflections and tail, and what Depth does to it.
 * Knobs: drag up and down (Shift for fine), mouse wheel, arrow keys, Home and
   End; double-click resets.
 * The look: a black panel with cream silkscreen and line drawings, typed notes
@@ -226,12 +298,9 @@ button opens it in a window of its own, also on a phone.
   (SIL Open Font License), whose letters are made of parallel lines like the
   tracks of a tape; labels in Syne, notes in Courier Prime. The fonts load from
   Google Fonts; without a connection the page falls back to system fonts.
-* In a track slot the editor shows the parameters only: the reel, the markers
-  and recording are in Heimat Solo.
 
-How it talks to the Move: the page uses Schwung's `schwung-remote-api.js`. In
-a slot it reads and writes `synth:<key>` (or whichever component the manager
-names). For the Tool tab Heimat Solo answers `module_id`, `rui_poll`
+How it talks to the Move: the page uses Schwung's `schwung-remote-api.js` and
+reads and writes `overtake_dsp:<key>`. For the Tool tab Heimat answers `module_id`, `rui_poll`
 (`rev:on:tick:bpm`, the rev moving about 25 times a second while something
 sounds, still otherwise) and `state`: a flat JSON object with the parameters,
 then `rev` and the live keys starting with `v_` (`v_pk` is a 256-column
@@ -244,14 +313,23 @@ as a demo on a made-up reel.
 
 ## Beta
 
-Version 0.7.0 is the first beta: the features are frozen and it now needs
-hours on real Moves. [BETA.md](BETA.md) is the test sheet (in Italian:
+Version 0.12.0 adds trimming: a splice can be cut to the part you want, and
+the noise of the buttons at the start and end of a recording can be left out.
+0.11.0 added four modulators (Wave, Random, Follow, Envelope), routed
+by holding a Track button and turning a knob. 0.10.0 added Pattern (repeatable chance for the genes) and the looper
+tape (fixed lengths, overdub straight after, a write head at Vari-Speed).
+0.9.0 made Heimat Solo simply Heimat and suspended the track-slot module. 0.8.0
+brought what the first beta on real
+Moves asked for: calmer encoders, a Gene-Size curve with more room for long
+genes, each effect on its own page, the old delay removed and a new reverb. [BETA.md](BETA.md) is the test sheet (in Italian:
 [BETA.it.md](BETA.it.md)); report what you find with the *Beta report*
 issue form. [CHANGELOG.md](CHANGELOG.md) lists what changed in each version.
 
-From 0.7.0 on, parameter keys are frozen: none is renamed or removed and no
-choice loses options, so saved sessions and track-slot patches keep working
-(`tests/fixtures/params_0.7.0.txt`, checked by the tests). A saved state from
+Parameter keys are frozen: none is renamed or removed and no choice loses
+options, so saved sessions keep working
+(`tests/fixtures/params_0.12.0.txt`, checked by the tests). The one exception
+was in 0.8.0, when the six `dly_*` keys of the old delay were retired; in older
+sessions they are simply ignored. A saved state from
 an older version opens with its own values, and controls it does not know start
 at their default. The saved state carries `"state_format": 1`.
 
@@ -259,23 +337,25 @@ at their default. The saved state carries `"state_format": 1`.
 
 The ready-made packages are on the
 [releases page](https://github.com/CairnDebil/schwung-heimat/releases):
-download `heimat-module.tar.gz` and `heimat-solo-module.tar.gz` and add them
-in Schwung Manager as below. To build them yourself instead:
+download `heimat-solo-module.tar.gz` (the file keeps its old name, so it
+updates an installed Heimat Solo) and add it in Schwung Manager as below. To
+build it yourself instead:
 
 Requirements: a Move with Schwung (1.7.3 or later), and Docker (or an
 `aarch64-linux-gnu-` toolchain) to build.
 
 ```bash
-bash scripts/build.sh      # -> dist/heimat-module.tar.gz and dist/heimat-solo-module.tar.gz
-bash scripts/install.sh    # SSH to move.local, installs both
+bash scripts/build.sh      # -> dist/heimat-solo-module.tar.gz
+bash scripts/install.sh    # SSH to move.local
 ```
 
-Or install the two tarballs from Schwung Manager (`http://move.local:7700`,
-*Modules*, custom module). Restart the Move afterwards.
+Or install the tarball from Schwung Manager (`http://move.local:7700`,
+*Modules*, custom module). Restart the Move afterwards: Heimat opens from
+Schwung's module menu like other takeover modules. If you had the old
+track-slot Heimat installed, it stays in the sound generators until you remove
+it.
 
-* **Heimat** goes in a Signal Chain slot as a sound generator (hold `Track 1–4`).
-* **Heimat Solo** opens from Schwung's module menu like other takeover modules.
-  For the input, use headphones or a line-in cable: with the built-in speakers on
+For the input, use headphones or a line-in cable: with the built-in speakers on
   the microphone hears the speakers, and Schwung may mute the input to avoid
   feedback.
 
@@ -286,13 +366,11 @@ and the length of the gaps, the Vari-Speed curve below the original speed, the
 envelope constants (Gauss width, the −40 dB end of Expodec), the overlap level
 compensation (1/√n), the transient detector, how far Time Stretch moves per tick,
 the range of Scatter (± half the splice, ± the spacing), the effect ranges and
-curves (shelf frequencies, delay tone range, reverb line lengths, decay and
-damping curves), the EQ picture (an approximation, not the exact response), and the screen font (the
+curves (shelf frequencies, reverb line lengths, the Size, Decay, Absorb,
+Speed and Tilt curves, the depth of the chorus and of the wandering), the EQ picture (an approximation, not the exact response), and the screen font (the
 layout assumes 8-pixel text rows, as in other takeover modules).
 
-Not included: control-voltage style outputs, audio-rate phase modulation, and
-recording in the chain module (a chain sound generator cannot hear the other
-tracks; use Heimat Solo for that).
+Not included: control-voltage style outputs and audio-rate phase modulation.
 
 ## Manual and editor demo online
 
@@ -314,11 +392,11 @@ bash scripts/test.sh               # SAN=1 for AddressSanitizer + UBSan, SCREENS
 ```
 
 On GitHub every push runs all of this, also with the sanitizers, and builds the
-two modules for ARM64 (`.github/workflows/ci.yml`); the tarballs are kept as a
+module for ARM64 (`.github/workflows/ci.yml`); the tarballs are kept as a
 download of the run. A tag `vX.Y.Z` publishes a release with the notes from
 CHANGELOG.md, as a pre-release while the version starts with 0.
 
-* **DSP**, built twice (chain and Solo): loader formats and markers, resampling,
+* **DSP**: loader formats and markers, resampling,
   pitch, Vari-Speed, Organize, Splice mode, Slide, Gene-Size, Morph stages, play
   modes, reel swaps under load, loading without stalling the audio, recording into
   a new splice and undo, recording over a splice from the input, empty-reel
@@ -329,10 +407,11 @@ CHANGELOG.md, as a pre-release while the version starts with 0.
   envelope shapes and their symmetry, Scatter in time and position, Spread,
   Width, selective granulation, and the duration / density / fill-factor figures
   checked against the audio; the effects: bit-exact output when they are back at
-  zero, the three EQ bands measured on noise, delay timing, feedback, ping-pong
-  and tempo sync (internal BPM and Move's tempo), reverb tail length, damping
-  and stereo, stability with everything at maximum, and recording through the
-  effects; the browser link of Heimat Solo (flat `state`, `rui_poll` still
+  zero, the three EQ bands measured on noise, the reverb (pre-delay timing,
+  later and longer answers from a bigger Size, Decay holding forever at the
+  top, Tilt, shimmer adding the octave above, everything at maximum staying
+  bounded, Reverse), reverb tail length, damping and stereo, stability with everything at maximum, and recording through the
+  effects; the browser link (flat `state`, `rui_poll` still
   when idle and moving while it plays, live keys ignored when a state is
   applied); the heads: timing of two heads, Chain against Own, backwards
   heads (an attack comes back as a swell), Rise and Fall measured an octave
@@ -342,21 +421,21 @@ CHANGELOG.md, as a pre-release while the version starts with 0.
   effects, so it is exact. Gene Reverse (the share of backward genes at 0, 50
   and 100%, and that they really read backwards) and Spread Intervals (only the
   allowed intervals, and by ear: a 440 Hz reel in Octaves sounds at 220, 440
-  and 880 Hz with nothing in between). Compatibility: the frozen keys of 0.7.0,
+  and 880 Hz with nothing in between). Compatibility: the frozen keys of 0.7.0 (minus the retired delay) and 0.8.0,
   sessions saved by 0.5.0, 0.6.0 and 0.7.0 (`tests/fixtures/`), states from a
   later version with unknown keys. The load meter.
   Checks on wall-clock time only report, without failing, on CI machines (`CI`
   set), with sanitizers, or with `HEIMAT_LAX_TIMING=1`.
 * **Browser editor and manual** (Playwright with Chromium; skipped without
-  it): the editor as a demo, as Heimat Solo in the Tool tab fed with the `state`
-  that the real DSP produced, and as a track-slot panel; knobs by mouse and
+  it): the editor as a demo and as Heimat in the Tool tab fed with the `state`
+  that the real DSP produced; knobs by mouse and
   keyboard, choices, the EQ points, splice selection and marker dragging on the
   reel, transport and the two-click Clear markers, updates coming back from
   the Move, a phone-sized screen with no sideways scrolling, the light theme;
   the manual's generated table, page tabs, control map and genes lab.
-* **UI** (Node 18+): the real `src/solo/ui.js` against a fake host — pages, knobs,
+* **UI** (Node 18+): the real `src/ui.js` against a fake host — pages, knobs,
   touch, pads in each mode, transport, markers, Delete hold, menu, file browser,
-  save message, LEDs, the MICRO page, the FX pages, the knob readout (never over
+  save message, LEDs, the MICRO page, the EQ and REVERB pages, the encoders, the knob readout (never over
   the waveform, gone shortly after the last turn), the About / DSP load screen
   and its version against `module.json`, exit. `docs/screens/` holds the screenshots.
 

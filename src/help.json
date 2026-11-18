@@ -2,109 +2,238 @@
   "title": "Heimat",
   "children": [
     {
-      "title": "Overview",
+      "title": "Pages",
       "lines": [
-        "Tape and microsound",
-        "sample player.",
-        "",
-        "Load a WAV from the",
-        "Reel page. Markers",
-        "in the file (like",
-        "other samplers)",
-        "become splices."
-      ]
-    },
-    {
-      "title": "Main knobs",
-      "lines": [
-        "Gene-Size: 0 plays",
-        " the whole splice.",
-        "Slide: start point.",
-        "Morph: gaps, loop,",
-        " overlaps, chords.",
-        "Vari-Speed: centre",
-        " stops; +-0.5 is the",
-        " original speed.",
-        "Organize: splice."
-      ]
-    },
-    {
-      "title": "Pad Mode",
-      "lines": [
-        "Pitch: notes set the",
-        " speed (1 V/oct from",
-        " the root note); the",
-        " key is Play gate.",
-        "Splice: one pad per",
-        " splice.",
-        "Drone: plays on its",
-        " own; pads retrigger."
-      ]
-    },
-    {
-      "title": "Play Gate",
-      "lines": [
-        "Classic: the gene in",
-        " progress finishes.",
-        "Momentary: stops at",
-        " key release.",
-        "Trigger Loop: pads",
-        " restart, never stop."
+        "Track 1: PLAY",
+        "Track 2: REEL (edit)",
+        "Track 3: REC / CLOCK,",
+        "again: LOOP.",
+        "Track 4: MICRO,",
+        "MICRO 2, EQ, HEADS,",
+        "HEADS 2, REVERB,",
+        "REVERB 2, SETUP 1, 2.",
+        "Shift+Track 3: HEADS",
+        "Shift+Track 1: MOD",
+        "Shift+Track 4: REVERB",
+        "Turn or touch: name",
+        "and value show below",
+        "Shift+Back: exit."
       ]
     },
     {
       "title": "Micro",
       "lines": [
-        "Env: gene envelope",
-        "(Edge, Tukey, Gauss,",
-        "Triangle, Expodec,",
-        "Rexpodec).",
-        "Scatter: irregular",
-        "timing and position.",
-        "Spread: random pitch",
-        "per gene, semitones.",
-        "Intervals: free, or",
-        "semitones, octaves,",
-        "fifths, major, minor.",
-        "Reverse: chance a",
-        "gene plays backwards.",
-        "Width: random pan.",
-        "Thr/Sel: play only",
-        "loud or quiet genes."
+        "Env: gene envelope.",
+        "Scatter: genes leave",
+        "the grid, start",
+        "points wander.",
+        "Spread: pitch band.",
+        "INTV: free pitch or",
+        "intervals (semi, oct,",
+        "5th, major, minor).",
+        "GREV: chance a gene",
+        "plays backwards.",
+        "Width: stereo cloud.",
+        "Thr/Sel: keep only",
+        "loud or quiet genes.",
+        "Top right: gene ms,",
+        "genes per second,",
+        "fill factor."
+      ]
+    },
+    {
+      "title": "Pattern",
+      "lines": [
+        "MICRO 2 (Track 4",
+        "twice). PATT: the",
+        "genes' chance comes",
+        "back every 2 to 32",
+        "genes. SEED: another",
+        "phrase. A new attack",
+        "starts it again.",
+        "OFF: chance is free."
+      ]
+    },
+    {
+      "title": "Modulators",
+      "lines": [
+        "Hold Track 1-4 and",
+        "turn a knob: WAVE,",
+        "RAND, FOLW or ENV",
+        "moves that control.",
+        "Turn back to 0: off.",
+        "Hold + Delete: clear",
+        "that source's routes",
+        "A flag on the left of",
+        "a cell: modulated.",
+        "Shift+Track 1: MOD 1",
+        "(Wave, Random), again",
+        "MOD 2 (Follow, Env)."
       ]
     },
     {
       "title": "Effects",
       "lines": [
-        "EQ: Low, Mid (with",
-        "Freq) and High,",
-        "+-15 dB.",
-        "Delay: Time or Sync",
-        "to the tempo, Fdbk,",
-        "Tone, Ping-Pong, Mix",
-        "Reverb: Decay, Damp,",
-        "Mix.",
-        "All off by default.",
-        "The chain's own FX",
-        "slots work too."
+        "Track 4 cycles MICRO,",
+        "MICRO 2, EQ, HEADS,",
+        "HEADS 2, REVERB 1, 2.",
+        "EQ: Low/Mid/Freq/High",
+        "and how much goes to",
+        "the heads and reverb.",
+        "Shift+Track 4: REVERB",
+        "(again: EQ).",
+        "RFX on: recordings",
+        "go through the FX.",
+        "Master FX works too."
+      ]
+    },
+    {
+      "title": "Reverb",
+      "lines": [
+        "SIZE: a box to a sky.",
+        "PRE: 7-500 ms before",
+        "the space answers.",
+        "DCAY: top = forever.",
+        "ABSB: first denser,",
+        "then darker.",
+        "DPTH left: chorus;",
+        "right: wandering",
+        "room; far right:",
+        "shimmer (octave up).",
+        "SPD: how fast.",
+        "TILT: dark / bright.",
+        "REVERB 2, RVRS: the",
+        "pre-delay backwards."
       ]
     },
     {
       "title": "Heads",
       "lines": [
+        "Shift+Track 3: HEADS",
         "A tape loop with up",
         "to 4 heads per side.",
-        "Time: note value.",
-        "Spacing spreads them",
-        "Reverse: heads read",
-        "backwards.",
-        "Wear: what each pass",
-        "does to the sound.",
-        "Mode: Fade, Glide,",
-        "Rise, Fall.",
-        "Routing: Own, Cross,",
-        "Chain, Wander.",
-        "Freeze loops it."
+        "TIME note value,",
+        "HEAD heads per side,",
+        "SPAC spread them,",
+        "REV read backwards.",
+        "HEADS 2: WEAR (Dark",
+        "Thin Crush Warm Fold",
+        "Fuzz), MODE (Fade",
+        "Glide Rise Fall),",
+        "ROUT (Own Cross",
+        "Chain Wander).",
+        "FRZ loops the tape.",
+        "Menu: Clear heads."
+      ]
+    },
+    {
+      "title": "Record",
+      "lines": [
+        "Rec: record over the",
+        "splice (TLA).",
+        "Shift+Rec or Sample:",
+        "record a new splice.",
+        "SOS: input vs reel.",
+        "Source Mix records",
+        "what you hear;",
+        "Input only the input.",
+        "Sync: start and stop",
+        "on the next tick."
+      ]
+    },
+    {
+      "title": "Loop",
+      "lines": [
+        "LOOP: Track 3 twice.",
+        "LEN: a new splice",
+        "stops by itself after",
+        "1 to 16 bars.",
+        "AFTR: then PLAY it,",
+        "or OVERDUB on it",
+        "until you stop.",
+        "HEAD STEADY: writes",
+        "at the speed of time",
+        "VARI: moves with the",
+        "tape (slow, reverse;",
+        "stopped: no writing)."
+      ]
+    },
+    {
+      "title": "Trim",
+      "lines": [
+        "Shift+Capture (or",
+        "Menu): TRIM splice.",
+        "Knob 1 start, knob 2",
+        "end, knob 3 zoom; jog",
+        "nudges. Click or",
+        "Capture: cut. Back:",
+        "keep all. Undo: back.",
+        "LOOP, KEYS: skip the",
+        "noise of the buttons",
+        "at start and end."
+      ]
+    },
+    {
+      "title": "Splices",
+      "lines": [
+        "Capture: marker at",
+        "the playhead (PLAY)",
+        "or cursor (REEL).",
+        "Jog moves the cursor",
+        "in REEL; click adds.",
+        "Delete: remove one.",
+        "Hold Delete: clear.",
+        "Shift+hold: new reel",
+        "Copy: auto-splice.",
+        "Undo undoes edits."
+      ]
+    },
+    {
+      "title": "Pads and steps",
+      "lines": [
+        "Steps 1-16: pick a",
+        "splice.",
+        "Pads follow Pad Mode",
+        "(PITCH/SPLICE/DRONE)",
+        "On REEL a pad plays",
+        "its splice.",
+        "Left/Right: splice.",
+        "Up/Down: octave or",
+        "splice bank."
+      ]
+    },
+    {
+      "title": "Clock",
+      "lines": [
+        "Loop: clock on/off.",
+        "Shift+Loop: source",
+        "(Internal/Move/MIDI)",
+        "Gene Shift steps the",
+        "genes on each tick;",
+        "Time Stretch glides",
+        "through the splice."
+      ]
+    },
+    {
+      "title": "Files",
+      "lines": [
+        "Menu: load a WAV,",
+        "new empty reel, save",
+        "auto-splice, clear.",
+        "Reels are saved to",
+        "Samples/Heimat with",
+        "their markers."
+      ]
+    },
+    {
+      "title": "Beta",
+      "lines": [
+        "Menu > About / DSP",
+        "load: version, load",
+        "(DSP avg, PEAK) and",
+        "OVER = late blocks.",
+        "OVER above 0: please",
+        "report it."
       ]
     }
   ]

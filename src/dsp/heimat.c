@@ -5,13 +5,11 @@
  *
  * An original tape and microsound instrument: a reel (a WAV file or a
  * recording) is cut into splices and played back as genes - grains whose size,
- * start, overlap, envelope, speed and scatter can all be varied. One engine,
- * two modules:
- *
- *   heimat       chain sound generator (HM_SOLO=0)
- *   heimat-solo  overtake instrument with its own screen (HM_SOLO=1): it reads
- *                the Move audio input and is driven by ui.js through the
- *                set_param / get_param keys listed in README.md
+ * start, overlap, envelope, speed and scatter can all be varied. It is an
+ * overtake module (id heimat-solo) with its own screen: it reads the Move's
+ * audio input and is driven by ui.js through the set_param / get_param keys
+ * listed in README.md. (Up to 0.8.0 the same engine also built a track-slot
+ * sound generator; it is suspended, see attic/track-module.)
  *
  * What the engine does
  *   - Reel: a WAV loaded on a worker thread, resampled to the host rate, held in
@@ -53,9 +51,6 @@
 
 #include "plugin_api_v1.h"
 
-#ifndef HM_SOLO
-#define HM_SOLO 0
-#endif
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -68,6 +63,8 @@
 #define HM_MAX_REEL_SEC   174.0            /* 2.9 minutes of tape per reel     */
 #define HM_FADE_CLASSIC   64               /* anti-click window, in samples   */
 #define HM_GENE_MIN_SEC   0.0005           /* smallest gene                   */
+#define HM_GENE_MAX_SEC   4.0              /* longest gene once Gene-Size leaves 0 */
+#define HM_GENE_CURVE     1.4              /* more of the knob for long genes  */
 #define HM_PK_BLOCK       256              /* frames per peak-pyramid block   */
 #define HM_VIEW_COLS      128
 #define HM_RUI_COLS       256              /* reel overview sent to the browser editor */
@@ -76,6 +73,11 @@
 #define HM_MIN_SPLICE     32               /* shortest allowed splice, frames */
 #define HM_STATE_MAX      4096
 #define HM_STATE_FORMAT   1                /* bump only if a saved key changes meaning */
+#define HM_MODS           4
+#define HM_MAX_ROUTES     16
+#define HM_TRIM_MIN       2048             /* shortest splice a trim may leave, frames */
+#define HM_TRIM_FADE      0.003            /* fade at a cut, seconds */
+#define HM_RING           (1u << 17)       /* overdub writes remembered, to take back a key press */
 
 #ifndef HM_DEFAULT_SAVE_DIR
 #define HM_DEFAULT_SAVE_DIR "/data/UserData/UserLibrary/Samples/Heimat"
@@ -107,10 +109,16 @@ enum {
     P_CLOCK_SRC, P_CLOCK_DIV, P_BPM, P_CLOCK_MODE, P_MUTE, P_SAVE48,
     P_SCATTER, P_SPREAD, P_WIDTH, P_THRESH, P_THR_MODE,
     P_EQ_LOW, P_EQ_MID, P_EQ_FREQ, P_EQ_HIGH,
-    P_DLY_TIME, P_DLY_SYNC, P_DLY_FDBK, P_DLY_TONE, P_DLY_MIX, P_DLY_PING,
-    P_REV_DECAY, P_REV_DAMP, P_REV_MIX, P_FX_REC,
+    P_REV_SIZE, P_REV_PRE, P_REV_REVERSE, P_REV_DECAY, P_REV_DAMP, P_REV_TILT, P_REV_DEPTH, P_REV_SPEED,
+    P_REV_MIX, P_FX_REC,
     P_HD_MIX, P_HD_TIME, P_HD_HEADS, P_HD_SPACE, P_HD_FDBK, P_HD_REV, P_HD_WEAR, P_HD_WAMT, P_HD_MODE, P_HD_ROUTE, P_HD_FREEZE,
     P_GENE_REV, P_SPR_MODE,
+    P_PATTERN, P_PAT_SEED, P_REC_LEN, P_REC_AFTER, P_REC_HEAD,
+    P_M1_SHAPE, P_M1_RATE, P_M1_SYNC, P_M1_RETRIG,
+    P_M2_RATE, P_M2_SMOOTH, P_M2_SYNC, P_M2_RETRIG,
+    P_M3_SRC, P_M3_GAIN, P_M3_ATK, P_M3_REL,
+    P_M4_ATK, P_M4_DCY, P_M4_MODE, P_M4_TRIG,
+    P_REC_TRIM,
     P_COUNT
 };
 
@@ -142,23 +150,32 @@ static const char *const OPT_ONOFF[] = { "Off", "On" };
 static const char *const OPT_CSRC[]  = { "Off", "Internal", "Move", "MIDI" };
 static const char *const OPT_CDIV[]  = { "1/16", "1/8", "1/4", "1/2", "1 bar" };
 static const char *const OPT_CMODE[] = { "Auto", "Gene Shift", "Time Stretch" };
-static const char *const OPT_DSYNC[] = { "Off", "1/16", "1/8T", "1/8", "1/8.", "1/4", "1/4.", "1/2" };
 static const char *const OPT_HDTIME[] = { "2 bars", "1 bar", "1/2.", "1/2", "1/4.", "1/4", "1/8.", "1/8", "1/8T", "1/16", "1/16T", "1/32", "1/64", "1/128" };
 static const char *const OPT_WEAR[]  = { "Dark", "Thin", "Crush", "Warm", "Fold", "Fuzz" };
 static const char *const OPT_HDMODE[] = { "Fade", "Glide", "Rise", "Fall" };
 static const char *const OPT_ROUTE[] = { "Own", "Cross", "Chain", "Wander" };
 static const char *const OPT_SPRMODE[] = { "Free", "Semitones", "Octaves", "Fifths", "Major", "Minor" };
+static const char *const OPT_PATTERN[] = { "Off", "2", "3", "4", "5", "6", "8", "12", "16", "32" };
+static const char *const OPT_RECLEN[] = { "Free", "1 bar", "2 bars", "4 bars", "8 bars", "16 bars" };
+static const char *const OPT_RECAFT[] = { "Play", "Overdub" };
+static const char *const OPT_RECHD[]  = { "Steady", "Vari-Speed" };
+static const char *const OPT_MWAVE[]  = { "Sine", "Triangle", "Ramp Up", "Ramp Down", "Square" };
+static const char *const OPT_MSYNC[]  = { "Free", "4 bars", "2 bars", "1 bar", "1/2", "1/4", "1/8", "1/16" };
+static const char *const OPT_FSRC[]   = { "Input", "Output" };
+static const char *const OPT_EMODE[]  = { "AD", "Hold", "Loop" };
+static const char *const OPT_ETRIG[]  = { "Pads", "Clock", "Pads + Clock" };
+static const char *const OPT_RTRIM[]  = { "Off", "50 ms", "100 ms", "200 ms", "300 ms", "500 ms" };
 
 #define PF(k, n, s, mn, mx, d, st) { k, n, s, T_FLOAT, mn, mx, d, st, NULL, 0 }
 #define PI(k, n, s, mn, mx, d)     { k, n, s, T_INT, (float)(mn), (float)(mx), (float)(d), 1.0f, NULL, 0 }
 #define PE(k, n, s, o, c, d)       { k, n, s, T_ENUM, 0.0f, (float)((c) - 1), (float)(d), 1.0f, o, c }
 
 static const pdef_t g_params[P_COUNT] = {
-    [P_GENE]      = PF("gene_size",        "Gene-Size",          "Gene",  0.0f, 1.0f, 0.0f, 0.005f),
-    [P_SLIDE]     = PF("slide",            "Slide",              "Slide", 0.0f, 1.0f, 0.0f, 0.005f),
-    [P_MORPH]     = PF("morph",            "Morph",              "Morph", 0.0f, 1.0f, 0.18f, 0.005f),
+    [P_GENE]      = PF("gene_size",        "Gene-Size",          "Gene",  0.0f, 1.0f, 0.0f, 0.0025f),
+    [P_SLIDE]     = PF("slide",            "Slide",              "Slide", 0.0f, 1.0f, 0.0f, 0.0025f),
+    [P_MORPH]     = PF("morph",            "Morph",              "Morph", 0.0f, 1.0f, 0.18f, 0.0025f),
     [P_VSPEED]    = PF("vari_speed",       "Vari-Speed",         "Speed", -1.0f, 1.0f, 0.5f, 0.005f),
-    [P_ORGANIZE]  = PF("organize",         "Organize",           "Org",   0.0f, 1.0f, 0.0f, 0.005f),
+    [P_ORGANIZE]  = PF("organize",         "Organize",           "Org",   0.0f, 1.0f, 0.0f, 0.0025f),
     [P_VOLUME]    = PF("volume",           "Volume",             "Vol",   0.0f, 1.0f, 0.8f, 0.01f),
     [P_PAD_MODE]  = PE("pad_mode",         "Pad Mode",           "Pads",  OPT_PAD, 3, PAD_PITCH),
     [P_PLAY_MODE] = PE("play_mode",        "Play Gate",          "Play",  OPT_PLAY, 3, PLAY_MOMENTARY),
@@ -184,41 +201,69 @@ static const pdef_t g_params[P_COUNT] = {
     [P_CLOCK_MODE]= PE("clock_mode",       "Clock Action",       "ClkAct", OPT_CMODE, 3, CM_AUTO),
     [P_MUTE]      = PE("mute",             "Mute",               "Mute",  OPT_ONOFF, 2, 0),
     [P_SAVE48]    = PE("save_48k",         "Save at 48 kHz",     "Save48", OPT_ONOFF, 2, 0),
-    [P_SCATTER]   = PF("scatter",          "Scatter",            "Scat",  0.0f, 1.0f, 0.0f, 0.005f),
+    [P_SCATTER]   = PF("scatter",          "Scatter",            "Scat",  0.0f, 1.0f, 0.0f, 0.0025f),
     [P_SPREAD]    = PF("spread",           "Pitch Spread (st)",  "Sprd",  0.0f, 12.0f, 0.0f, 0.05f),
     [P_WIDTH]     = PF("width",            "Stereo Width",       "Width", 0.0f, 1.0f, 0.0f, 0.01f),
-    [P_THRESH]    = PF("threshold",        "Threshold",          "Thr",   0.0f, 1.0f, 0.5f, 0.005f),
+    [P_THRESH]    = PF("threshold",        "Threshold",          "Thr",   0.0f, 1.0f, 0.5f, 0.0025f),
     [P_THR_MODE]  = PE("thr_mode",         "Selective",          "Select", OPT_THR, 3, 0),
     [P_EQ_LOW]    = PF("eq_low",           "EQ Low (dB)",        "Low",   -15.0f, 15.0f, 0.0f, 0.1f),
     [P_EQ_MID]    = PF("eq_mid",           "EQ Mid (dB)",        "Mid",   -15.0f, 15.0f, 0.0f, 0.1f),
     [P_EQ_FREQ]   = PF("eq_freq",          "EQ Mid Freq (Hz)",   "Freq",  100.0f, 8000.0f, 1000.0f, 10.0f),
     [P_EQ_HIGH]   = PF("eq_high",          "EQ High (dB)",       "High",  -15.0f, 15.0f, 0.0f, 0.1f),
-    [P_DLY_TIME]  = PF("dly_time",         "Delay Time (ms)",    "Time",  10.0f, 2000.0f, 375.0f, 1.0f),
-    [P_DLY_SYNC]  = PE("dly_sync",         "Delay Sync",         "Sync",  OPT_DSYNC, 8, 0),
-    [P_DLY_FDBK]  = PF("dly_fdbk",         "Delay Feedback",     "Fdbk",  0.0f, 0.95f, 0.4f, 0.005f),
-    [P_DLY_TONE]  = PF("dly_tone",         "Delay Tone",         "Tone",  0.0f, 1.0f, 0.6f, 0.005f),
-    [P_DLY_MIX]   = PF("dly_mix",          "Delay Mix",          "Delay", 0.0f, 1.0f, 0.0f, 0.005f),
-    [P_DLY_PING]  = PE("dly_ping",         "Delay Ping-Pong",    "Ping",  OPT_ONOFF, 2, 0),
-    [P_REV_DECAY] = PF("rev_decay",        "Reverb Decay",       "Decay", 0.0f, 1.0f, 0.5f, 0.005f),
-    [P_REV_DAMP]  = PF("rev_damp",         "Reverb Damping",     "Damp",  0.0f, 1.0f, 0.5f, 0.005f),
-    [P_REV_MIX]   = PF("rev_mix",          "Reverb Mix",         "Reverb", 0.0f, 1.0f, 0.0f, 0.005f),
+    [P_REV_SIZE]  = PF("rev_size",         "Reverb Size",        "Size",  0.0f, 1.0f, 0.5f, 0.0025f),
+    [P_REV_PRE]   = PF("rev_predelay",     "Reverb Pre-Delay (ms)", "PreDly", 7.0f, 500.0f, 20.0f, 1.0f),
+    [P_REV_REVERSE] = PE("rev_reverse",    "Reverb Reverse",     "Revrs", OPT_ONOFF, 2, 0),
+    [P_REV_DECAY] = PF("rev_decay",        "Reverb Decay",       "Decay", 0.0f, 1.0f, 0.5f, 0.0025f),
+    [P_REV_DAMP]  = PF("rev_damp",         "Reverb Absorb",      "Absorb", 0.0f, 1.0f, 0.4f, 0.0025f),
+    [P_REV_TILT]  = PF("rev_tilt",         "Reverb Tilt",        "Tilt",  -1.0f, 1.0f, 0.0f, 0.005f),
+    [P_REV_DEPTH] = PF("rev_depth",        "Reverb Mod Depth",   "Depth", -1.0f, 1.0f, 0.0f, 0.005f),
+    [P_REV_SPEED] = PF("rev_speed",        "Reverb Mod Speed",   "Speed", 0.0f, 1.0f, 0.35f, 0.0025f),
+    [P_REV_MIX]   = PF("rev_mix",          "Reverb Mix",         "Reverb", 0.0f, 1.0f, 0.0f, 0.0025f),
     [P_FX_REC]    = PE("fx_rec",           "Record Through FX",  "RecFX", OPT_ONOFF, 2, 0),
-    [P_HD_MIX]    = PF("hd_mix",           "Heads Mix",          "Heads", 0.0f, 1.0f, 0.0f, 0.005f),
+    [P_HD_MIX]    = PF("hd_mix",           "Heads Mix",          "Heads", 0.0f, 1.0f, 0.0f, 0.0025f),
     [P_HD_TIME]   = PE("hd_time",          "Heads Time",         "HTime", OPT_HDTIME, 14, 7),
     [P_HD_HEADS]  = PI("hd_heads",         "Heads",              "HCount", 1, 4, 2),
-    [P_HD_SPACE]  = PF("hd_spacing",       "Head Spacing",       "Space", 0.0f, 1.0f, 0.3f, 0.005f),
-    [P_HD_FDBK]   = PF("hd_fdbk",          "Heads Feedback",     "HFdbk", 0.0f, 1.0f, 0.45f, 0.005f),
-    [P_HD_REV]    = PF("hd_reverse",       "Reverse Heads",      "Rev",   0.0f, 1.0f, 0.0f, 0.005f),
+    [P_HD_SPACE]  = PF("hd_spacing",       "Head Spacing",       "Space", 0.0f, 1.0f, 0.3f, 0.0025f),
+    [P_HD_FDBK]   = PF("hd_fdbk",          "Heads Feedback",     "HFdbk", 0.0f, 1.0f, 0.45f, 0.0025f),
+    [P_HD_REV]    = PF("hd_reverse",       "Reverse Heads",      "Rev",   0.0f, 1.0f, 0.0f, 0.0025f),
     [P_HD_WEAR]   = PE("hd_wear",          "Wear",               "Wear",  OPT_WEAR, 6, 0),
-    [P_HD_WAMT]   = PF("hd_wear_amt",      "Wear Amount",        "WAmt",  0.0f, 1.0f, 0.0f, 0.005f),
+    [P_HD_WAMT]   = PF("hd_wear_amt",      "Wear Amount",        "WAmt",  0.0f, 1.0f, 0.0f, 0.0025f),
     [P_HD_MODE]   = PE("hd_mode",          "Heads Mode",         "HMode", OPT_HDMODE, 4, 0),
     [P_HD_ROUTE]  = PE("hd_route",         "Heads Routing",      "Route", OPT_ROUTE, 4, 0),
     [P_HD_FREEZE] = PE("hd_freeze",        "Freeze Heads",       "Freeze", OPT_ONOFF, 2, 0),
-    [P_GENE_REV]  = PF("gene_reverse",     "Gene Reverse",       "GRev",  0.0f, 1.0f, 0.0f, 0.005f),
+    [P_GENE_REV]  = PF("gene_reverse",     "Gene Reverse",       "GRev",  0.0f, 1.0f, 0.0f, 0.0025f),
     [P_SPR_MODE]  = PE("spread_mode",      "Spread Intervals",   "Intvl", OPT_SPRMODE, 6, 0),
+    [P_PATTERN]   = PE("pattern",          "Pattern",            "Pattn", OPT_PATTERN, 10, 0),
+    [P_PAT_SEED]  = PI("pattern_seed",     "Pattern Seed",       "Seed",  1, 999, 1),
+    [P_REC_LEN]   = PE("rec_length",       "Record Length",      "RecLen", OPT_RECLEN, 6, 0),
+    [P_REC_AFTER] = PE("rec_after",        "After Recording",    "After", OPT_RECAFT, 2, 0),
+    [P_REC_HEAD]  = PE("rec_head",         "Overdub Head",       "RecHd", OPT_RECHD, 2, 0),
+    [P_M1_SHAPE]  = PE("mod_wave_shape",   "Wave Shape",         "WShape", OPT_MWAVE, 5, 0),
+    [P_M1_RATE]   = PF("mod_wave_rate",    "Wave Rate",          "WRate", 0.0f, 1.0f, 0.4f, 0.0025f),
+    [P_M1_SYNC]   = PE("mod_wave_sync",    "Wave Sync",          "WSync", OPT_MSYNC, 8, 0),
+    [P_M1_RETRIG] = PE("mod_wave_retrig",  "Wave Restart",       "WRst",  OPT_ONOFF, 2, 0),
+    [P_M2_RATE]   = PF("mod_rand_rate",    "Random Rate",        "RRate", 0.0f, 1.0f, 0.4f, 0.0025f),
+    [P_M2_SMOOTH] = PF("mod_rand_smooth",  "Random Smooth",      "RSmth", 0.0f, 1.0f, 0.0f, 0.0025f),
+    [P_M2_SYNC]   = PE("mod_rand_sync",    "Random Sync",        "RSync", OPT_MSYNC, 8, 0),
+    [P_M2_RETRIG] = PE("mod_rand_retrig",  "Random On Pads",     "RRst",  OPT_ONOFF, 2, 0),
+    [P_M3_SRC]    = PE("mod_follow_src",   "Follow Source",      "FSrc",  OPT_FSRC, 2, 0),
+    [P_M3_GAIN]   = PF("mod_follow_gain",  "Follow Gain",        "FGain", 0.0f, 1.0f, 0.5f, 0.0025f),
+    [P_M3_ATK]    = PF("mod_follow_attack","Follow Attack",      "FAtk",  0.0f, 1.0f, 0.1f, 0.0025f),
+    [P_M3_REL]    = PF("mod_follow_release","Follow Release",    "FRel",  0.0f, 1.0f, 0.4f, 0.0025f),
+    [P_M4_ATK]    = PF("mod_env_attack",   "Envelope Attack",    "EAtk",  0.0f, 1.0f, 0.1f, 0.0025f),
+    [P_M4_DCY]    = PF("mod_env_decay",    "Envelope Decay",     "EDcy",  0.0f, 1.0f, 0.4f, 0.0025f),
+    [P_M4_MODE]   = PE("mod_env_mode",     "Envelope Mode",      "EMode", OPT_EMODE, 3, 0),
+    [P_M4_TRIG]   = PE("mod_env_trigger",  "Envelope Trigger",   "ETrig", OPT_ETRIG, 3, 0),
+    [P_REC_TRIM]  = PE("rec_trim",         "Trim Key Noise",     "KeyTrm", OPT_RTRIM, 6, 0),
 };
 
-static const float k_dsync_beats[8] = { 0.0f, 0.25f, 1.0f / 3.0f, 0.5f, 0.75f, 1.0f, 1.5f, 2.0f };
+static const float k_rec_trim_ms[6] = { 0.0f, 50.0f, 100.0f, 200.0f, 300.0f, 500.0f };
+
+static const float k_msync_beats[8] = { 0.0f, 16.0f, 8.0f, 4.0f, 2.0f, 1.0f, 0.5f, 0.25f };
+
+static const int k_pattern_len[10] = { 0, 2, 3, 4, 5, 6, 8, 12, 16, 32 };
+static const int k_rec_bars[6]     = { 0, 1, 2, 4, 8, 16 };
+
 static const float k_hd_beats[14] = { 8.0f, 4.0f, 3.0f, 2.0f, 1.5f, 1.0f, 0.75f, 0.5f, 1.0f / 3.0f, 0.25f, 1.0f / 6.0f, 0.125f, 0.0625f, 0.03125f };
 
 static const double k_div_beats[5] = { 0.25, 0.5, 1.0, 2.0, 4.0 };
@@ -240,16 +285,17 @@ typedef struct {
     uint8_t shape;             /* envelope shape at birth                       */
 } gene_t;
 
-typedef struct { uint32_t mk[HM_MAX_MARKERS]; int n; uint32_t frames; } undo_t;
+typedef struct { uint32_t mk[HM_MAX_MARKERS]; int n; uint32_t frames; struct reel_s *reel; int ssrc; } undo_t;   /* reel: the reel before a trim */   /* reel: the reel before a trim */
 
 /* ------------------------------------------------------- internal effects */
 
-#define FX_DLY_LEN   131072                /* 2.97 s at 44.1 kHz: power of two  */
-#define FX_DLY_MASK  (FX_DLY_LEN - 1)
-#define FX_REV_N     8
-#define FX_REV_LEN   4096                  /* per FDN line, power of two        */
-#define FX_AP_N      4
-#define FX_AP_LEN    1024
+#define RV_N        8                     /* lines of the reverb network        */
+#define RV_LEN      16384                 /* per line, power of two             */
+#define RV_PRE_LEN  65536                 /* pre-delay / reverse buffer         */
+#define RV_AP_N     4
+#define RV_AP_LEN   2048
+#define RV_SH_LEN   8192                  /* shimmer pitch shifter              */
+#define RV_SH_WIN   3072.0f
 
 typedef struct { float b0, b1, b2, a1, a2; float z1[2], z2[2]; } biquad_t;
 
@@ -258,21 +304,30 @@ typedef struct {
     biquad_t bq[3];
     float eq_cur[4];                       /* low, mid, freq, high as applied   */
     int eq_on;
-    /* delay */
-    float dl[FX_DLY_LEN], dr[FX_DLY_LEN];
-    uint32_t dw;
-    float dtime;                           /* smoothed delay time, samples      */
-    float dlp[2], dhp[2];                  /* tone low-pass, DC/mud high-pass   */
-    float dmix;
-    /* reverb: allpass diffusers into an 8-line feedback delay network */
-    float ap[FX_AP_N][FX_AP_LEN];
-    uint32_t ap_len[FX_AP_N], ap_w;
-    float line[FX_REV_N][FX_REV_LEN];
-    uint32_t line_len[FX_REV_N], rw;
-    float rlp[FX_REV_N];
-    float rg[FX_REV_N], rdamp, rmix;
-    float rdecay_cur, rdamp_cur;
-    int rev_idle;                          /* lines cleared, nothing to process */
+    /* reverb: pre-delay (or reverse) -> diffusers -> 8-line network -> tilt */
+    float pre[RV_PRE_LEN];
+    uint32_t pw;
+    float pre_t, pre_ph;                   /* pre-delay in samples (gliding), reverse phase */
+    float ap[RV_AP_N][RV_AP_LEN];
+    float ap_base[RV_AP_N];
+    uint32_t aw;
+    float line[RV_N][RV_LEN];
+    float base[RV_N];                      /* line lengths at Size 1x           */
+    uint32_t rw;
+    float rlp[RV_N], rg[RV_N];
+    float scale, scale_tgt;                /* Size as a length factor           */
+    float diff_g, damp_a;
+    float lfo_ph, lfo_inc;                 /* cyclic modulation                  */
+    float erg[RV_N], erg_tgt[RV_N], erg_cnt[RV_N], erg_c;  /* ergodic modulation  */
+    uint32_t rng;
+    float sh[RV_SH_LEN];
+    uint32_t shw;
+    float sh_ph;
+    biquad_t tb[2];                        /* tilt: low and high shelf           */
+    float tilt_cur;
+    int tilt_on;
+    float rmix;
+    int rev_idle;                          /* buffers cleared, nothing to process */
     float dc;                              /* anti-denormal offset              */
 } fx_t;
 
@@ -299,7 +354,8 @@ typedef struct { int n; uint32_t m[HM_MAX_MARKERS]; } mk_result_t;
 
 typedef struct {
     float sr;
-    float p[P_COUNT];
+    float p[P_COUNT];                      /* what the engine uses: base + modulation */
+    float base[P_COUNT];                   /* what the knobs are set to (saved, reported) */
 
     /* reel handling */
     reel_t *reel;                          /* audio thread only                 */
@@ -337,6 +393,7 @@ typedef struct {
     double spawn_cd;
     int spawn_full;
     uint32_t spawn_idx;
+    uint32_t pat_i;                        /* position in the Pattern cycle */
     uint32_t genes_spawned, genes_skipped;
     float load_avg, load_pk;   /* time spent in render, as a share of the block's real time */
     uint32_t load_over;        /* blocks that took longer than real time */
@@ -351,6 +408,32 @@ typedef struct {
     int rec_armed;                         /* mode waiting for the next clock tick */
     int rec_stop_armed;
     uint32_t rec_pos, rec_start, rec_lo, rec_len;
+    /* modulators: Wave, Random, Follow, Envelope; up to HM_MAX_ROUTES routes */
+    float mod[HM_MODS];                    /* current outputs: Wave/Random -1..1, Follow/Envelope 0..1 */
+    double m_ph[2];                        /* Wave and Random phases, 0..1 */
+    float m_rcur, m_rtgt, m_rfrom;         /* Random: value, next step, step it glides from */
+    float m_env;                           /* Follow */
+    int m_es; float m_el;                  /* Envelope: stage (0 off, 1 attack, 2 decay/hold), level */
+    int m_trig;                            /* pad pressed / clock tick since the last block (bits) */
+    uint32_t m_rng;
+    float blk_in_pk, blk_out_pk;           /* last block's peaks, for Follow */
+    struct { int16_t tgt; int8_t src; float amt; } mr[HM_MAX_ROUTES];
+    int n_mr;
+    uint32_t mr_ver;
+    uint32_t rec_target;                   /* Record Length in frames, 0 = free */
+    uint32_t rec_skip, rec_cut;            /* Trim Key Noise: frames not written at the start / taken back at the end */
+    uint32_t rec_t;                        /* frames since recording started */
+    struct { uint32_t idx, t; float l, r; } *ring;   /* what each overdub write replaced */
+    uint32_t ring_n;
+    /* trimming a splice: preview, then a job for the worker that builds the trimmed reel */
+    int trim_on, trim_sp;
+    uint32_t trim_a, trim_b;
+    atomic_int trim_req, undo_reel_req;
+    atomic_int tj_state;                   /* 0 idle, 1 job for the worker, 2 building */
+    int tj_stale;                          /* another reel arrived meanwhile: drop the result */
+    struct { reel_t *src; uint32_t lo, a, b, hi; int n_mk; uint32_t mk[HM_MAX_MARKERS]; int sel; } tj;
+    _Atomic(reel_t *) trim_out;            /* worker -> audio */
+    double rec_fpos;                       /* Vari-Speed overdub head, within the splice */
     atomic_int saving;
 
     /* clock */
@@ -397,7 +480,7 @@ static void set_param_value(hm_t *h, int i, float v)
     const pdef_t *d = &g_params[i];
     v = clampf(v, d->min, d->max);
     if (d->type != T_FLOAT) v = floorf(v + 0.5f);
-    h->p[i] = v;
+    h->base[i] = h->p[i] = v;               /* a modulated control gets its modulation back on the next block */
     if (i == P_SPLICE_SRC || i == P_DIVIDE) h->bounds_dirty = 1;
     atomic_fetch_add_explicit(&h->state_gen, 1, memory_order_relaxed);
 }
@@ -866,6 +949,42 @@ static void retire_free_all(hm_t *h)
     while (p) { reel_t *n = p->next; free_reel(p); p = n; }
 }
 
+/* Trim: a new reel without [lo, a) and [b, hi) of one splice; the markers after
+ * the cut move back, short fades where the sound was cut. Runs on the worker;
+ * the source reel is not written while a job is pending (no recording, no
+ * edits that touch audio). */
+static reel_t *build_trimmed(hm_t *h)
+{
+    const reel_t *o = h->tj.src;
+    const uint32_t lo = h->tj.lo, a = h->tj.a, b = h->tj.b, hi = h->tj.hi;
+    reel_t *r = alloc_reel(o->cap);
+    if (!r) return NULL;
+    const uint32_t head = a - lo, tail = hi - b;
+    uint32_t w = 0;
+    memcpy(r->l, o->l, sizeof(float) * lo); memcpy(r->r, o->r, sizeof(float) * lo); w = lo;
+    memcpy(r->l + w, o->l + a, sizeof(float) * (b - a)); memcpy(r->r + w, o->r + a, sizeof(float) * (b - a));
+    w += b - a;
+    memcpy(r->l + w, o->l + hi, sizeof(float) * (o->frames - hi)); memcpy(r->r + w, o->r + hi, sizeof(float) * (o->frames - hi));
+    r->frames = o->frames - head - tail;
+    uint32_t nf = (uint32_t)(HM_TRIM_FADE * h->sr);
+    if (nf > (b - a) / 4) nf = (b - a) / 4;
+    for (uint32_t i = 0; i < nf; i++) {
+        const float g = (float)i / (float)nf;
+        if (head) { r->l[lo + i] *= g; r->r[lo + i] *= g; }
+        if (tail) { r->l[lo + (b - a) - 1 - i] *= g; r->r[lo + (b - a) - 1 - i] *= g; }
+    }
+    r->n_markers = 0;
+    for (int i = 0; i < h->tj.n_mk; i++) {
+        uint32_t m = h->tj.mk[i];
+        if (m > lo && m < hi) continue;                       /* (none: lo and hi are splice bounds) */
+        if (m >= hi) m -= head + tail;
+        if (m > 0 && m < r->frames && r->n_markers < HM_MAX_MARKERS) r->markers[r->n_markers++] = m;
+    }
+    r->truncated = o->truncated; r->resampled = o->resampled;
+    reel_all_peaks(r);
+    return r;
+}
+
 static void *worker_main(void *arg)
 {
     hm_t *h = (hm_t *)arg;
@@ -878,7 +997,7 @@ static void *worker_main(void *arg)
 
     unsigned last_req = 0, last_save = 0, last_gen = 0;
     int idle_ticks = 0;
-    if (HM_SOLO) read_state_file(h);
+    read_state_file(h);
     while (atomic_load_explicit(&h->run, memory_order_acquire)) {
         unsigned s = atomic_load_explicit(&h->req_seq, memory_order_acquire);
         if (s != last_req) {
@@ -916,6 +1035,13 @@ static void *worker_main(void *arg)
             }
             continue;
         }
+        if (atomic_load_explicit(&h->tj_state, memory_order_acquire) == 1) {
+            atomic_store(&h->tj_state, 2);
+            reel_t *r = build_trimmed(h);
+            if (r) atomic_store_explicit(&h->trim_out, r, memory_order_release);
+            else atomic_store(&h->tj_state, 0);
+            continue;
+        }
         if (atomic_exchange(&h->detect_req, 0) && h->reel && !h->rec_mode) {
             if (atomic_load(&h->mk_res_ready) == 0) {
                 detect_transients(h->reel, h->detect_sens, h->sr, &h->mk_res);
@@ -924,7 +1050,7 @@ static void *worker_main(void *arg)
             continue;
         }
         retire_free_all(h);
-        if (HM_SOLO) {                                        /* persist the settings 2 s after the last change */
+        {                                                     /* persist the settings 2 s after the last change */
             unsigned g = atomic_load_explicit(&h->state_gen, memory_order_relaxed);
             if (g != last_gen) { last_gen = g; idle_ticks = 0; }
             else if (idle_ticks >= 0 && ++idle_ticks == 200) { write_state_file(h); idle_ticks = -1; }
@@ -990,10 +1116,28 @@ static void compute_bounds(hm_t *h)
     }
 }
 
+static void retire_reel(hm_t *h, reel_t *old)
+{
+    if (!old) return;
+    old->next = atomic_load_explicit(&h->retire, memory_order_relaxed);
+    while (!atomic_compare_exchange_weak_explicit(&h->retire, &old->next, old, memory_order_release, memory_order_relaxed)) {}
+}
+
+static void undo_clear(hm_t *h)
+{
+    for (int i = 0; i < h->undo_n; i++) { retire_reel(h, h->undo[i].reel); h->undo[i].reel = NULL; }
+    h->undo_n = 0;
+}
+
 static void push_undo(hm_t *h)
 {
-    if (h->undo_n == HM_UNDO) { memmove(&h->undo[0], &h->undo[1], sizeof(undo_t) * (HM_UNDO - 1)); h->undo_n--; }
+    if (h->undo_n == HM_UNDO) {
+        retire_reel(h, h->undo[0].reel);
+        memmove(&h->undo[0], &h->undo[1], sizeof(undo_t) * (HM_UNDO - 1));
+        h->undo_n--;
+    }
     undo_t *u = &h->undo[h->undo_n++];
+    u->reel = NULL;
     u->n = h->n_mk;
     memcpy(u->mk, h->mk, sizeof h->mk);
     u->frames = h->reel ? h->reel->frames : 0;
@@ -1001,7 +1145,7 @@ static void push_undo(hm_t *h)
 
 static void markers_changed(hm_t *h)
 {
-    h->p[P_SPLICE_SRC] = 0;                                    /* edited markers become the splice source */
+    h->p[P_SPLICE_SRC] = h->base[P_SPLICE_SRC] = 0;                                    /* edited markers become the splice source */
     h->bounds_dirty = 1;
     publish_markers(h);
     atomic_fetch_add_explicit(&h->state_gen, 1, memory_order_relaxed);
@@ -1071,6 +1215,7 @@ static void markers_divide(hm_t *h, int n)
 static void do_undo(hm_t *h)
 {
     if (h->rec_mode || h->undo_n == 0) return;
+    if (h->undo[h->undo_n - 1].reel) { atomic_store(&h->undo_reel_req, 1); return; }   /* a trim: the audio thread swaps the reel back */
     undo_t *u = &h->undo[--h->undo_n];
     h->n_mk = u->n;
     memcpy(h->mk, u->mk, sizeof h->mk);
@@ -1093,7 +1238,7 @@ static void adopt_markers_from_reel(hm_t *h)
     const reel_t *r = h->reel;
     h->n_mk = r ? r->n_markers : 0;
     if (r) memcpy(h->mk, r->markers, sizeof(uint32_t) * (size_t)r->n_markers);
-    h->undo_n = 0;
+    undo_clear(h);
     publish_markers(h);
 }
 
@@ -1141,6 +1286,7 @@ static void retrigger(hm_t *h)
     kill_all(h, (int)(0.003f * h->sr));
     h->spawn_cd = 0.0;
     h->spawn_idx = 0;                      /* the first gene after a trigger is the unison one */
+    h->pat_i = 0;                          /* and the Pattern starts again from its first gene */
 }
 
 static int clock_action(const hm_t *h)                     /* 0 none, 1 gene shift, 2 time stretch */
@@ -1188,6 +1334,19 @@ static inline float gene_env(int shape, double age, double remain)
     }
 }
 
+/* Gene-Size above 0, as seconds: from the splice (at most 4 s) down to half a
+ * millisecond. The curve gives the knob's first half to genes you hear as
+ * sounds (4 s .. about 130 ms) and the second half to grains. */
+static double gene_seconds(float gk, double splice_sec)
+{
+    double tmax = splice_sec < HM_GENE_MAX_SEC ? splice_sec : HM_GENE_MAX_SEC;
+    const double tmin = HM_GENE_MIN_SEC;
+    if (tmax < tmin * 2.0) tmax = tmin * 2.0;
+    double x = ((double)gk - 0.005) / 0.995;
+    x = x < 0.0 ? 0.0 : (x > 1.0 ? 1.0 : x);
+    return tmax * pow(tmin / tmax, pow(x, HM_GENE_CURVE));
+}
+
 /* the cloud as the gene engine will produce it now: gene length and the
  * interval between gene starts, both in output samples (before Scatter) */
 static void gene_metrics(const hm_t *h, double *len_out_s, double *spacing_out_s)
@@ -1207,9 +1366,7 @@ static void gene_metrics(const hm_t *h, double *len_out_s, double *spacing_out_s
         if (fade > len_out * 0.5) fade = len_out * 0.5;
         spacing = m < 0.18f ? len_out * (1.0 + (double)(0.18f - m) / 0.18 * 0.5) : (len_out - fade) / (double)morph_neff(m);
     } else {
-        double tmax = (double)len / (double)h->sr, tmin = HM_GENE_MIN_SEC;
-        if (tmax < tmin * 2.0) tmax = tmin * 2.0;
-        len_out = tmax * pow(tmin / tmax, (double)(gk - 0.005f) / 0.995) * (double)h->sr;
+        len_out = gene_seconds(gk, (double)len / (double)h->sr) * (double)h->sr;
         if (len_out < 16.0) len_out = 16.0;
         double fade = ov ? len_out * 0.5 : (double)HM_FADE_CLASSIC;
         if (fade > len_out * 0.5) fade = len_out * 0.5;
@@ -1265,13 +1422,16 @@ static float spread_semitones(hm_t *h, float range, int mode)
 
 /* returns the spacing until the next gene starts: output samples for time-mode
  * genes, source frames for full-splice genes */
-static double spawn_gene(hm_t *h, int rank, float speed_signed)
+static double spawn_gene_core(hm_t *h, int rank, float speed_signed)
 {
     const reel_t *r = h->reel;
     const float *P = h->p;
     int sp = clampi(h->sel_splice, 0, h->n_splices - 1);
     uint32_t lo = h->bounds[sp], len = h->bounds[sp + 1] - lo;
     if (len < 2) len = 2;
+    if (h->trim_on && sp == h->trim_sp && h->trim_a >= lo && h->trim_b <= lo + len && h->trim_b > h->trim_a + 1) {
+        lo = h->trim_a; len = h->trim_b - h->trim_a;                /* trimming: hear only what will stay */
+    }
 
     gene_t *g = NULL;
     for (int i = 0; i < HM_MAX_GENES; i++) if (!h->genes[i].active) { g = &h->genes[i]; break; }
@@ -1286,11 +1446,7 @@ static double spawn_gene(hm_t *h, int rank, float speed_signed)
     if (gk < 0.005f) {
         len_out = (double)len / (double)(aspd > 1e-6f ? aspd : 1e-6f);
     } else {
-        double tmax = (double)len / (double)h->sr;
-        double tmin = HM_GENE_MIN_SEC;
-        if (tmax < tmin * 2.0) tmax = tmin * 2.0;
-        double T = tmax * pow(tmin / tmax, (double)(gk - 0.005f) / 0.995);
-        double l = T * (double)h->sr;
+        double l = gene_seconds(gk, (double)len / (double)h->sr) * (double)h->sr;
         if (l < 16.0) l = 16.0;
         life = (uint32_t)l;
         len_out = l;
@@ -1380,10 +1536,46 @@ static double spawn_gene(hm_t *h, int rank, float speed_signed)
 
 /* --------------------------------------------------------------- recording */
 
+/* Pattern: the random choices of a gene (Scatter, Spread, Gene Reverse, Width,
+ * spacing, the Morph chord tones) come from a generator seeded by the Pattern
+ * Seed and the gene's place in a cycle of N genes. Every N genes the same
+ * choices come back, so a cloud repeats like a phrase; another seed is another
+ * phrase. The free-running generator is put back afterwards, so turning
+ * Pattern off goes on where it left. */
+static uint32_t pat_hash(uint32_t x)
+{
+    x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16;
+    return x ? x : 0x9E3779B9u;
+}
+
+static double spawn_gene(hm_t *h, int rank, float speed_signed)
+{
+    const int L = k_pattern_len[clampi((int)h->p[P_PATTERN], 0, 9)];
+    if (!L) return spawn_gene_core(h, rank, speed_signed);
+    const uint32_t keep = h->rng;
+    const uint32_t step = h->pat_i % (uint32_t)L;
+    h->rng = pat_hash((uint32_t)h->p[P_PAT_SEED] * 0x9E3779B1u + step * 0x85EBCA77u + 0x27D4EB2Fu);
+    const double sp = spawn_gene_core(h, rank, speed_signed);
+    h->rng = keep;
+    h->pat_i = step + 1;
+    return sp;
+}
+
+static float fx_bpm(const hm_t *h);
+
+static inline void ring_push(hm_t *h, const reel_t *r, uint32_t w)
+{
+    if (!h->ring) return;
+    const uint32_t e = h->ring_n++ & (HM_RING - 1);
+    h->ring[e].idx = w; h->ring[e].t = h->rec_t; h->ring[e].l = r->l[w]; h->ring[e].r = r->r[w];
+}
+
 static void rec_begin(hm_t *h, int mode)
 {
     reel_t *r = h->reel;
-    if (!r || h->rec_mode || atomic_load(&h->saving) || h->n_splices < 0) return;
+    if (!r || h->rec_mode || atomic_load(&h->saving) || h->n_splices < 0 || atomic_load(&h->tj_state)) return;
+    h->trim_on = 0;
+    h->rec_skip = h->rec_cut = 0; h->rec_t = 0; h->ring_n = 0;
     if (mode == REC_CUR && r->frames < 2) mode = REC_NEW;      /* nothing to record over yet */
     if (mode == REC_NEW) {
         if (r->frames + HM_MIN_SPLICE >= r->cap) return;
@@ -1394,15 +1586,53 @@ static void rec_begin(hm_t *h, int mode)
             markers_changed(h);
         }
         h->sel_override = -1;
+        /* Record Length: stop by itself after so many bars at Heimat's tempo */
+        const int bars = k_rec_bars[clampi((int)h->p[P_REC_LEN], 0, 5)];
+        h->rec_target = bars ? (uint32_t)lrint((double)bars * 4.0 * 60.0 / (double)fx_bpm(h) * (double)h->sr) : 0;
     } else {
         int sp = clampi(h->sel_splice, 0, h->n_splices - 1);
         h->rec_lo = h->bounds[sp];
         h->rec_len = h->bounds[sp + 1] - h->bounds[sp];
         h->rec_pos = 0;
+        h->rec_fpos = 0.0;
+        h->rec_target = 0;
     }
     h->rec_mode = mode;
     h->rec_armed = 0;
     h->bounds_dirty = 1;
+}
+
+static uint32_t key_trim_frames(const hm_t *h)
+{
+    return (uint32_t)(k_rec_trim_ms[clampi((int)h->p[P_REC_TRIM], 0, 5)] * 0.001f * h->sr);
+}
+
+/* Trim Key Noise at the end: a new splice loses its last frames, an overdub
+ * gets back what its last frames replaced */
+static void rec_take_back(hm_t *h, int mode)
+{
+    reel_t *r = h->reel;
+    uint32_t c = h->rec_cut;
+    h->rec_cut = 0;
+    if (!r || !c) return;
+    if (mode == REC_NEW) {
+        const uint32_t keep = h->rec_start + HM_MIN_SPLICE + 1;
+        if (r->frames <= keep) return;
+        if (r->frames - c < keep) c = r->frames - keep;
+        const uint32_t from = r->frames - c;
+        memset(r->l + from, 0, sizeof(float) * c); memset(r->r + from, 0, sizeof(float) * c);
+        r->frames = from;
+        for (uint32_t k = from / HM_PK_BLOCK; k <= (from + c) / HM_PK_BLOCK && k < r->pk_n; k++) pk_block(r, k);
+    } else if (mode == REC_CUR && h->ring) {
+        const uint32_t n = h->ring_n < HM_RING ? h->ring_n : HM_RING;
+        for (uint32_t k = 1; k <= n; k++) {
+            const uint32_t e = (h->ring_n - k) & (HM_RING - 1);
+            if (h->rec_t - h->ring[e].t >= c) break;
+            r->l[h->ring[e].idx] = h->ring[e].l; r->r[h->ring[e].idx] = h->ring[e].r;
+        }
+        const uint32_t a = h->rec_lo, b = h->rec_lo + h->rec_len;
+        for (uint32_t k = a / HM_PK_BLOCK; b > a && k <= (b - 1) / HM_PK_BLOCK && k < r->pk_n; k++) pk_block(r, k);
+    }
 }
 
 static void rec_end(hm_t *h)
@@ -1410,6 +1640,7 @@ static void rec_end(hm_t *h)
     reel_t *r = h->reel;
     if (!h->rec_mode) return;
     int mode = h->rec_mode;
+    rec_take_back(h, mode);
     h->rec_mode = REC_IDLE;
     h->rec_stop_armed = 0;
     if (mode == REC_NEW && r) {
@@ -1418,6 +1649,14 @@ static void rec_end(hm_t *h)
         } else {
             h->sel_override = h->n_mk;                                 /* hear the new splice at once */
             retrigger(h);
+            if (h->p[P_REC_AFTER] > 0.5f) {                            /* After Recording = Overdub: go on */
+                h->rec_lo = h->rec_start;                               /* over the loop just closed */
+                h->rec_len = r->frames - h->rec_start;
+                h->rec_pos = 0;
+                h->rec_fpos = 0.0;
+                h->rec_target = 0;
+                h->rec_mode = REC_CUR;
+            }
         }
     }
     h->bounds_dirty = 1;
@@ -1429,7 +1668,7 @@ static void rec_request(hm_t *h, int mode)
 {
     if (h->rec_mode || h->rec_armed) return;
     if (h->p[P_REC_SYNC] > 0.5f && (int)h->p[P_CLOCK_SRC] != CLK_OFF && h->clk_running) h->rec_armed = mode;
-    else rec_begin(h, mode);
+    else { rec_begin(h, mode); if (h->rec_mode) h->rec_skip = key_trim_frames(h); }   /* the press is heard: skip it */
 }
 
 static void rec_stop_request(hm_t *h)
@@ -1437,7 +1676,7 @@ static void rec_stop_request(hm_t *h)
     if (h->rec_armed) { h->rec_armed = 0; return; }
     if (!h->rec_mode) return;
     if (h->p[P_REC_SYNC] > 0.5f && (int)h->p[P_CLOCK_SRC] != CLK_OFF && h->clk_running) h->rec_stop_armed = 1;
-    else rec_end(h);
+    else { h->rec_cut = key_trim_frames(h); rec_end(h); }
 }
 
 static void clock_tick(hm_t *h)
@@ -1445,6 +1684,7 @@ static void clock_tick(hm_t *h)
     h->clk_idx++;
     if (h->since_tick > 1.0) h->tick_len = h->tick_len > 1.0 ? h->tick_len * 0.5 + h->since_tick * 0.5 : h->since_tick;
     h->since_tick = 0.0;
+    h->m_trig |= 2;
     if (h->rec_armed) rec_begin(h, h->rec_armed);
     else if (h->rec_stop_armed) rec_end(h);
     if (clock_action(h) == 1 && h->p[P_GENE] >= 0.005f && h->spawn_on) retrigger(h);
@@ -1471,6 +1711,7 @@ static void note_on(hm_t *h, int note)
 {
     const int pad = (int)h->p[P_PAD_MODE];
     const int from_silent = (h->n_notes == 0);
+    h->m_trig |= 1;                                    /* modulators that listen to the pads */
     note_stack_remove(h, note);
     if (h->n_notes < HM_MAX_NOTES) h->notes[h->n_notes++] = (uint8_t)note;
 
@@ -1509,8 +1750,172 @@ static void build_state_json(const hm_t *h, char *buf, int len)
     char esc[HM_PATH_MAX * 2];
     json_escape(h->cur_path, esc, sizeof esc);
     jb_add(&j, "{\"sample_path\":\"%s\",\"state_format\":%d", esc, HM_STATE_FORMAT);
-    for (int i = 0; i < P_COUNT; i++) jb_add(&j, ",\"%s\":%.4f", g_params[i].key, h->p[i]);
+    for (int i = 0; i < P_COUNT; i++) jb_add(&j, ",\"%s\":%.4f", g_params[i].key, h->base[i]);
+    jb_add(&j, ",\"mod_routes\":\"");
+    for (int r = 0; r < h->n_mr; r++) jb_add(&j, "%s%s:%d:%.3f", r ? "," : "", g_params[h->mr[r].tgt].key, h->mr[r].src, (double)h->mr[r].amt);
+    jb_add(&j, "\"");
     jb_add(&j, "}");
+}
+
+/* --------------------------------------------------------------- modulators
+ * Four sources: Wave (an LFO), Random (stepped or gliding), Follow (the level
+ * of the input or of the output) and Envelope (attack / decay, started by the
+ * pads or the clock). A route adds source x amount x range to a continuous
+ * control, on top of where its knob stands; the knob value itself (base[]) is
+ * what is saved and shown. Computed once per block. */
+
+static int mod_route_find(const hm_t *h, int src, int tgt)
+{
+    for (int r = 0; r < h->n_mr; r++) if (h->mr[r].src == src && h->mr[r].tgt == tgt) return r;
+    return -1;
+}
+
+static int mod_target_ok(int tgt) { return tgt >= 0 && tgt < P_COUNT && g_params[tgt].type == T_FLOAT; }
+
+static void mod_routes_changed(hm_t *h)
+{
+    h->mr_ver++;
+    atomic_fetch_add_explicit(&h->state_gen, 1, memory_order_relaxed);
+}
+
+/* amount 0 (or nearly) removes the route */
+static void mod_route_set(hm_t *h, int src, int tgt, float amt)
+{
+    if (src < 0 || src >= HM_MODS || !mod_target_ok(tgt)) return;
+    amt = clampf(amt, -1.0f, 1.0f);
+    int r = mod_route_find(h, src, tgt);
+    if (fabsf(amt) < 0.005f) {
+        if (r < 0) return;
+        h->mr[r] = h->mr[--h->n_mr];
+        h->p[tgt] = h->base[tgt];
+    } else if (r >= 0) {
+        h->mr[r].amt = amt;
+    } else {
+        if (h->n_mr >= HM_MAX_ROUTES) return;
+        h->mr[h->n_mr].src = (int8_t)src; h->mr[h->n_mr].tgt = (int16_t)tgt; h->mr[h->n_mr].amt = amt;
+        h->n_mr++;
+    }
+    mod_routes_changed(h);
+}
+
+/* which = -1 all, 0..3 one source, or 100 + parameter index for one control */
+static void mod_routes_clear(hm_t *h, int which)
+{
+    int j = 0;
+    for (int r = 0; r < h->n_mr; r++) {
+        const int gone = which == -1 || which == h->mr[r].src || which == 100 + h->mr[r].tgt;
+        if (gone) h->p[h->mr[r].tgt] = h->base[h->mr[r].tgt];
+        else h->mr[j++] = h->mr[r];
+    }
+    if (j != h->n_mr) { h->n_mr = j; mod_routes_changed(h); }
+}
+
+/* "key:src:amount,key:src:amount" */
+static void mod_routes_parse(hm_t *h, const char *s)
+{
+    mod_routes_clear(h, -1);
+    while (s && *s) {
+        char key[64]; int src; float amt; int n = 0;
+        if (sscanf(s, "%63[^:]:%d:%f%n", key, &src, &amt, &n) == 3) mod_route_set(h, src, param_index(key), amt);
+        s = strchr(s, ',');
+        if (s) s++;
+    }
+    mod_routes_changed(h);
+}
+
+static float mod_rate_hz(const hm_t *h, int rate_p, int sync_p)
+{
+    const int sy = clampi((int)h->p[sync_p], 0, 7);
+    if (sy) return fx_bpm(h) / 60.0f / k_msync_beats[sy];
+    return 0.02f * powf(1000.0f, h->p[rate_p]);
+}
+
+static float wave_shape(int shape, double ph)
+{
+    const float x = (float)ph;
+    switch (shape) {
+    case 1: return x < 0.5f ? 4.0f * x - 1.0f : 3.0f - 4.0f * x;      /* triangle */
+    case 2: return 2.0f * x - 1.0f;                                   /* ramp up */
+    case 3: return 1.0f - 2.0f * x;                                   /* ramp down */
+    case 4: return x < 0.5f ? 1.0f : -1.0f;                           /* square */
+    default: return sinf(2.0f * (float)M_PI * x);
+    }
+}
+
+static void mods_block(hm_t *h, int frames)
+{
+    const float *P = h->p;
+    const float sr = h->sr, dt = (float)frames / sr;
+    const int trig = h->m_trig;
+    h->m_trig = 0;
+
+    /* Wave */
+    if ((trig & 1) && P[P_M1_RETRIG] > 0.5f) h->m_ph[0] = 0.0;
+    h->m_ph[0] += (double)(mod_rate_hz(h, P_M1_RATE, P_M1_SYNC) * dt);
+    h->m_ph[0] -= floor(h->m_ph[0]);
+    h->mod[0] = wave_shape(clampi((int)P[P_M1_SHAPE], 0, 4), h->m_ph[0]);
+
+    /* Random: a new value every period; Smooth glides to it over that much of the period */
+    {
+        int step = 0;
+        if ((trig & 1) && P[P_M2_RETRIG] > 0.5f) { h->m_ph[1] = 0.0; step = 1; }
+        h->m_ph[1] += (double)(mod_rate_hz(h, P_M2_RATE, P_M2_SYNC) * dt);
+        if (h->m_ph[1] >= 1.0) { h->m_ph[1] -= floor(h->m_ph[1]); step = 1; }
+        if (step) {                                           /* its own generator: the genes' chance is left alone */
+            uint32_t x = h->m_rng ? h->m_rng : 0x1234567u; x ^= x << 13; x ^= x >> 17; x ^= x << 5; h->m_rng = x;
+            h->m_rfrom = h->m_rcur; h->m_rtgt = (float)(x >> 8) * (2.0f / 16777216.0f) - 1.0f;
+        }
+        const float sm = P[P_M2_SMOOTH];
+        if (sm < 0.01f) h->m_rcur = h->m_rtgt;
+        else {
+            float u = clampf((float)h->m_ph[1] / sm, 0.0f, 1.0f);
+            u = u * u * (3.0f - 2.0f * u);
+            h->m_rcur = h->m_rfrom + (h->m_rtgt - h->m_rfrom) * u;
+        }
+        h->mod[1] = h->m_rcur;
+    }
+
+    /* Follow: peak level of the last block, through attack / release */
+    {
+        const float lv = (int)P[P_M3_SRC] ? h->blk_out_pk : h->blk_in_pk;
+        const float g = powf(10.0f, (-6.0f + 36.0f * P[P_M3_GAIN]) / 20.0f);
+        const float x = clampf(lv * g, 0.0f, 1.0f);
+        const float ta = 0.001f * powf(1000.0f, P[P_M3_ATK]), tr = 0.01f * powf(300.0f, P[P_M3_REL]);
+        const float k = 1.0f - expf(-dt / (x > h->m_env ? ta : tr));
+        h->m_env += (x - h->m_env) * k;
+        h->mod[2] = h->m_env;
+    }
+
+    /* Envelope: linear attack, exponential-looking decay (or hold while a pad is down) */
+    {
+        const int tm = clampi((int)P[P_M4_TRIG], 0, 2);
+        const int fire = ((trig & 1) && tm != 1) || ((trig & 2) && tm != 0);
+        const int mode = clampi((int)P[P_M4_MODE], 0, 2);
+        const float ta = 0.001f * powf(5000.0f, P[P_M4_ATK]), td = 0.001f * powf(5000.0f, P[P_M4_DCY]);
+        if (fire) h->m_es = 1;
+        if (h->m_es == 1) {
+            h->m_el += dt / ta;
+            if (h->m_el >= 1.0f) { h->m_el = 1.0f; h->m_es = 2; }
+        } else if (h->m_es == 2) {
+            if (!(mode == 1 && h->n_notes > 0)) {
+                h->m_el -= dt / td;
+                if (h->m_el <= 0.0f) { h->m_el = 0.0f; h->m_es = mode == 2 ? 1 : 0; }
+            }
+        }
+        h->mod[3] = h->m_el * h->m_el;
+    }
+
+    /* routes: every target starts from its knob, then each route adds to it */
+    for (int r = 0; r < h->n_mr; r++) h->p[h->mr[r].tgt] = h->base[h->mr[r].tgt];
+    for (int r = 0; r < h->n_mr; r++) {
+        const int t = h->mr[r].tgt;
+        const pdef_t *d = &g_params[t];
+        h->p[t] += h->mr[r].amt * h->mod[h->mr[r].src] * (d->max - d->min);
+    }
+    for (int r = 0; r < h->n_mr; r++) {
+        const int t = h->mr[r].tgt;
+        h->p[t] = clampf(h->p[t], g_params[t].min, g_params[t].max);
+    }
 }
 
 /* A complete saved state (it carries "sample_path") restores every parameter:
@@ -1526,6 +1931,9 @@ static void apply_state_json(hm_t *h, const char *val)
         if (json_num(val, g_params[i].key, &f) == 0) set_param_value(h, i, f);
         else if (full) set_param_value(h, i, g_params[i].def);
     }
+    char routes[HM_MAX_ROUTES * 72];
+    if (json_str(val, "mod_routes", routes, sizeof routes) == 0) mod_routes_parse(h, routes);
+    else if (full) mod_routes_clear(h, -1);
     char path[HM_PATH_MAX];
     if (json_str(val, "sample_path", path, sizeof path) == 0 && strcmp(path, h->cur_path) != 0) request_load(h, path);
 }
@@ -1577,24 +1985,19 @@ static inline float soft_clip(float x)                 /* tanh-like, cheap; |x| 
 
 static void fx_init(hm_t *h)
 {
-    static const uint32_t k_lines[FX_REV_N] = { 1123, 1291, 1447, 1613, 1777, 1949, 2111, 2293 };
-    static const uint32_t k_ap[FX_AP_N] = { 142, 107, 379, 277 };
+    /* mutually prime-ish lengths, 25..52 ms at Size 1x */
+    static const float k_lines[RV_N] = { 1123, 1291, 1447, 1613, 1777, 1949, 2111, 2293 };
+    static const float k_ap[RV_AP_N] = { 142, 107, 379, 277 };
     fx_t *f = &h->fx;
     const float k = h->sr / 44100.0f;
-    for (int i = 0; i < FX_REV_N; i++) {
-        uint32_t L = (uint32_t)lrintf((float)k_lines[i] * k);
-        f->line_len[i] = L < 2 ? 2 : (L > FX_REV_LEN - 1 ? FX_REV_LEN - 1 : L);
-    }
-    for (int i = 0; i < FX_AP_N; i++) {
-        uint32_t L = (uint32_t)lrintf((float)k_ap[i] * k);
-        f->ap_len[i] = L < 2 ? 2 : (L > FX_AP_LEN - 1 ? FX_AP_LEN - 1 : L);
-    }
+    for (int i = 0; i < RV_N; i++) f->base[i] = k_lines[i] * k;
+    for (int i = 0; i < RV_AP_N; i++) f->ap_base[i] = k_ap[i] * k;
     f->eq_cur[0] = f->eq_cur[1] = f->eq_cur[3] = 0.0f;
     f->eq_cur[2] = 1000.0f;
-    f->dtime = 0.375f * h->sr;
+    f->scale = f->scale_tgt = 1.0f;
+    f->pre_t = 0.02f * h->sr;
     f->rev_idle = 1;
-    f->rdecay_cur = -1.0f;
-    f->rdamp_cur = -1.0f;
+    f->rng = 0x9e3779b9u;
     f->dc = 1e-18f;
 }
 
@@ -1608,13 +2011,16 @@ static float fx_bpm(const hm_t *h)
     return bpm;
 }
 
-/* delay time in samples as set now (free time or a note value at the tempo) */
-static float fx_delay_target(const hm_t *h)
-{
-    const int sync = clampi((int)h->p[P_DLY_SYNC], 0, 7);
-    float t = sync ? k_dsync_beats[sync] * 60.0f / fx_bpm(h) * h->sr : h->p[P_DLY_TIME] * 0.001f * h->sr;
-    return clampf(t, 1.0f, (float)(FX_DLY_LEN - 4));
-}
+/* Size as a factor on the line lengths: from a box (0.04x, about 1 ms
+ * between reflections) to a space no building has (5x, a quarter second) */
+static inline float rev_scale(float size) { return 0.04f * powf(125.0f, clampf(size, 0.0f, 1.0f)); }
+/* Decay as reverberation time, 0.12 s .. 60 s; the top of the knob holds forever */
+static inline float rev_t60(float d) { return 0.12f * powf(500.0f, clampf(d, 0.0f, 0.995f) / 0.995f); }
+/* Speed of the inner modulation: 0.05 Hz .. 200 Hz */
+static inline float rev_rate(float s) { return 0.05f * powf(4000.0f, clampf(s, 0.0f, 1.0f)); }
+
+static inline uint32_t fx_rand(fx_t *f) { f->rng ^= f->rng << 13; f->rng ^= f->rng >> 17; f->rng ^= f->rng << 5; return f->rng; }
+static inline float fx_randu(fx_t *f) { return (float)(fx_rand(f) >> 8) * (1.0f / 16777216.0f); }
 
 static void fx_block(hm_t *h)
 {
@@ -1641,98 +2047,191 @@ static void fx_block(hm_t *h)
     if (!on && f->eq_on) for (int i = 0; i < 3; i++) memset(f->bq[i].z1, 0, sizeof f->bq[i].z1), memset(f->bq[i].z2, 0, sizeof f->bq[i].z2);
     f->eq_on = on;
 
-    /* reverb: decay -> per-line feedback gain, damping -> line low-pass */
-    if (P[P_REV_DECAY] != f->rdecay_cur) {
-        f->rdecay_cur = P[P_REV_DECAY];
-        const float t60 = 0.3f * powf(40.0f, f->rdecay_cur);         /* 0.3 s .. 12 s */
-        for (int i = 0; i < FX_REV_N; i++) f->rg[i] = powf(10.0f, -3.0f * (float)f->line_len[i] / (t60 * sr));
-    }
-    if (P[P_REV_DAMP] != f->rdamp_cur) {
-        f->rdamp_cur = P[P_REV_DAMP];
-        const float fc = 18000.0f * powf(0.06f, f->rdamp_cur);       /* 18 kHz .. 1.1 kHz */
-        f->rdamp = 1.0f - expf(-2.0f * (float)M_PI * fc / sr);
-    }
-    if (P[P_REV_MIX] > 0.0f) f->rev_idle = 0;
-    else if (!f->rev_idle && f->rmix < 1e-5f) {                       /* faded out: clear and stop */
-        memset(f->line, 0, sizeof f->line);
+    /* reverb: wake on Mix, clear and sleep once it has faded out */
+    if (P[P_REV_MIX] > 0.0f) {
+        if (f->rev_idle) { f->scale = rev_scale(P[P_REV_SIZE]); f->pre_t = P[P_REV_PRE] * 0.001f * sr; }
+        f->rev_idle = 0;
+    } else if (!f->rev_idle && f->rmix < 1e-5f) {
+        memset(f->pre, 0, sizeof f->pre);
         memset(f->ap, 0, sizeof f->ap);
+        memset(f->line, 0, sizeof f->line);
+        memset(f->sh, 0, sizeof f->sh);
         memset(f->rlp, 0, sizeof f->rlp);
+        memset(f->tb, 0, sizeof f->tb);
+        f->tilt_cur = 0.0f; f->tilt_on = 0;
         f->rmix = 0.0f;
         f->rev_idle = 1;
     }
+    if (f->rev_idle) return;
+
+    f->scale_tgt = rev_scale(P[P_REV_SIZE]);
+    /* Decay: the gain of each line from its length now; bigger spaces ring
+     * longer at the same setting; the top of the knob holds forever */
+    const float d = P[P_REV_DECAY];
+    if (d >= 0.995f) for (int i = 0; i < RV_N; i++) f->rg[i] = 1.0f;
+    else {
+        const float t60 = rev_t60(d) * clampf(sqrtf(f->scale), 0.25f, 2.2f);
+        for (int i = 0; i < RV_N; i++) f->rg[i] = powf(10.0f, -3.0f * f->base[i] * f->scale / (t60 * sr));
+    }
+    /* Absorb: the first third brings in diffusion, the rest damping */
+    const float a = clampf(P[P_REV_DAMP], 0.0f, 1.0f);
+    f->diff_g = 0.72f * fminf(1.0f, a / 0.3f);
+    const float damp = clampf((a - 0.3f) / 0.7f, 0.0f, 1.0f);
+    f->damp_a = damp <= 0.0f ? 1.0f : 1.0f - expf(-2.0f * (float)M_PI * (20000.0f * powf(0.03f, damp)) / sr);
+    /* inner modulation */
+    const float rate = rev_rate(P[P_REV_SPEED]);
+    f->lfo_inc = rate / sr;
+    f->erg_c = 1.0f - expf(-2.0f * (float)M_PI * rate * 2.0f / sr);
+    /* Tilt: low end up and highs a little down to the left, the other way to the right */
+    const float t = clampf(P[P_REV_TILT], -1.0f, 1.0f);
+    if (t != f->tilt_cur) {
+        f->tilt_cur += clampf(t - f->tilt_cur, -0.05f, 0.05f);
+        if (fabsf(t - f->tilt_cur) < 0.002f) f->tilt_cur = t;
+        bq_shelf(&f->tb[0], sr, 250.0f, -12.0f * f->tilt_cur, 0);
+        bq_shelf(&f->tb[1], sr, 3500.0f, f->tilt_cur > 0.0f ? 18.0f * f->tilt_cur : 6.0f * f->tilt_cur, 1);
+        if (f->tilt_cur == 0.0f) memset(f->tb, 0, sizeof f->tb);
+    }
+    f->tilt_on = f->tilt_cur != 0.0f;
+}
+
+/* straight up to 1, then bending gently toward 2: keeps an endless tail endless */
+static inline float rv_limit(float x)
+{
+    const float a = fabsf(x);
+    if (a <= 1.0f) return x;
+    const float e = a - 1.0f, y = 1.0f + e / (1.0f + e);
+    return x < 0.0f ? -y : y;
+}
+
+static inline float rv_read(const float *buf, uint32_t mask, uint32_t w, float d)
+{
+    const float rp = (float)w - d;
+    const float fl = floorf(rp), fr = rp - fl;
+    const uint32_t i0 = (uint32_t)(int32_t)fl & mask;
+    const float a = buf[i0], b = buf[(i0 + 1) & mask];
+    return a + (b - a) * fr;
 }
 
 static inline void heads_frame(hm_t *h, float *pl, float *pr);
 
-/* one stereo frame through EQ -> Delay -> Heads -> Reverb */
-static inline void fx_frame(hm_t *h, float *pl, float *pr, float dtarget, float tone_a, float hp_a)
+/* The reverb. The input waits in the pre-delay (or, with Reverse, is read
+ * backwards in chunks of the pre-delay's length), is smeared by four
+ * all-pass diffusers and enters a network of eight delay lines mixed by a
+ * Hadamard matrix. Size scales every length at once, so turning it glides
+ * between spaces; Decay sets the gain of each line from its length; Absorb
+ * is first diffusion, then damping inside the loop. Depth moves the lengths:
+ * to the left a chorus of eight phases (cyclic), to the right each line
+ * wanders to random lengths (ergodic); at the far right an octave above the
+ * tail is fed back in (shimmer). Tilt is the last thing, outside the loop. */
+static inline void reverb_frame(hm_t *h, float *pl, float *pr)
 {
     fx_t *f = &h->fx;
-    const float *P = h->p;
+    const float *P = h->p, sr = h->sr;
     float l = *pl, r = *pr;
+    f->rmix += (P[P_REV_MIX] - f->rmix) * 0.002f;
+    f->scale += (f->scale_tgt - f->scale) * 0.0004f;
 
+    /* pre-delay, or the same stretch of time backwards */
+    f->pre[f->pw & (RV_PRE_LEN - 1)] = 0.5f * (l + r) + f->dc;
+    const uint32_t pw = f->pw++;
+    const float pt = P[P_REV_PRE] * 0.001f * sr;
+    f->pre_t += (pt - f->pre_t) * 0.0005f;
+    float x;
+    if (P[P_REV_REVERSE] > 0.5f) {
+        const float D = fmaxf(f->pre_t, 0.042f * sr);
+        f->pre_ph += 1.0f / D; if (f->pre_ph >= 1.0f) f->pre_ph -= 1.0f;
+        x = 0.0f;
+        for (int k = 0; k < 2; k++) {
+            float p = f->pre_ph + 0.5f * (float)k; if (p >= 1.0f) p -= 1.0f;
+            const float wv = sinf((float)M_PI * p);
+            x += wv * wv * rv_read(f->pre, RV_PRE_LEN - 1, pw, 2.0f * p * D + 1.0f);
+        }
+    } else x = rv_read(f->pre, RV_PRE_LEN - 1, pw, fmaxf(f->pre_t, 1.0f));
+
+    /* shimmer: an octave above the tail, back into the network */
+    const float dep = clampf(P[P_REV_DEPTH], -1.0f, 1.0f);
+    if (dep > 0.85f) {
+        f->sh_ph += 1.0f / RV_SH_WIN; if (f->sh_ph >= 1.0f) f->sh_ph -= 1.0f;
+        float y = 0.0f;
+        for (int k = 0; k < 2; k++) {
+            float p = f->sh_ph + 0.5f * (float)k; if (p >= 1.0f) p -= 1.0f;
+            const float wv = sinf((float)M_PI * p);
+            y += wv * wv * rv_read(f->sh, RV_SH_LEN - 1, f->shw, RV_SH_WIN * (1.0f - p) + 2.0f);
+        }
+        x += 0.55f * (dep - 0.85f) / 0.15f * y;
+    }
+
+    /* diffusion */
+    const float sq = sqrtf(f->scale);
+    const uint32_t aw = f->aw++;
+    for (int k = 0; k < RV_AP_N; k++) {
+        float *b = f->ap[k];
+        const float dl = clampf(f->ap_base[k] * sq, 2.0f, (float)(RV_AP_LEN - 4));
+        const float dd = rv_read(b, RV_AP_LEN - 1, aw, dl);
+        const float w = x + f->diff_g * dd;
+        b[aw & (RV_AP_LEN - 1)] = w;
+        x = dd - f->diff_g * w;
+    }
+
+    /* the network */
+    float cyc = 0.0f, erg = 0.0f, sn = 0.0f, cs = 1.0f;
+    if (dep < 0.0f) {
+        cyc = dep * dep * sqrtf(-dep);                               /* |d|^1.5 */
+        f->lfo_ph += f->lfo_inc; if (f->lfo_ph >= 1.0f) f->lfo_ph -= 1.0f;
+        sn = sinf(2.0f * (float)M_PI * f->lfo_ph); cs = cosf(2.0f * (float)M_PI * f->lfo_ph);
+    } else if (dep > 0.0f) erg = fminf(1.0f, dep / 0.85f) * sqrtf(fminf(1.0f, dep / 0.85f));
+    static const float k_s[RV_N] = { 0.0f, 0.70710678f, 1.0f, 0.70710678f, 0.0f, -0.70710678f, -1.0f, -0.70710678f };
+    static const float k_c[RV_N] = { 1.0f, 0.70710678f, 0.0f, -0.70710678f, -1.0f, -0.70710678f, 0.0f, 0.70710678f };
+    float o[RV_N];
+    const uint32_t rw = f->rw++;
+    for (int i = 0; i < RV_N; i++) {
+        const float L = f->base[i] * f->scale;
+        float md = 0.0f;
+        if (cyc > 0.0f) md = cyc * fminf(0.06f * L, 400.0f) * (sn * k_c[i] + cs * k_s[i]);
+        if (erg > 0.0f || f->erg[i] != 0.0f) {
+            if ((f->erg_cnt[i] -= 1.0f) <= 0.0f) {
+                f->erg_tgt[i] = erg * 0.45f * L * (2.0f * fx_randu(f) - 1.0f);
+                f->erg_cnt[i] = sr / (f->lfo_inc * sr + 1e-3f) * (0.5f + fx_randu(f));
+            }
+            f->erg[i] += (f->erg_tgt[i] - f->erg[i]) * f->erg_c;
+            if (erg == 0.0f && fabsf(f->erg[i]) < 1e-3f) f->erg[i] = 0.0f;
+            md += f->erg[i];
+        }
+        const float dl = clampf(L + md, 2.0f, (float)(RV_LEN - 4));
+        const float y = rv_read(f->line[i], RV_LEN - 1, rw, dl);
+        f->rlp[i] += (y - f->rlp[i]) * f->damp_a;
+        o[i] = f->rlp[i];
+    }
+    float m[RV_N];                                                    /* 8-point Hadamard */
+    for (int i = 0; i < RV_N; i++) m[i] = o[i];
+    for (int s = 1; s < RV_N; s <<= 1)
+        for (int i = 0; i < RV_N; i += s << 1)
+            for (int j = i; j < i + s; j++) { const float a = m[j], b = m[j + s]; m[j] = a + b; m[j + s] = a - b; }
+    static const float k_in_sign[RV_N] = { 1, 1, -1, 1, -1, -1, 1, -1 };
+    for (int i = 0; i < RV_N; i++)
+        f->line[i][rw & (RV_LEN - 1)] = rv_limit(f->rg[i] * m[i] * 0.35355339f + k_in_sign[i] * x) + f->dc;
+    float revl = 0.6f * (o[0] + o[2] - o[4] + o[6]), revr = 0.6f * (o[1] - o[3] + o[5] + o[7]);
+    f->sh[f->shw++ & (RV_SH_LEN - 1)] = 0.5f * (revl + revr);
+    if (f->tilt_on) {
+        revl += f->dc; revr += f->dc;
+        for (int k = 0; k < 2; k++) { revl = bq_run(&f->tb[k], 0, revl); revr = bq_run(&f->tb[k], 1, revr); }
+    }
+    const float rm = f->rmix, dry = rm < 0.5f ? 1.0f : 2.0f * (1.0f - rm), wet = rm > 0.5f ? 1.0f : 2.0f * rm;
+    *pl = l * dry + revl * wet;
+    *pr = r * dry + revr * wet;
+}
+
+/* one stereo frame through EQ -> Heads -> Reverb */
+static inline void fx_frame(hm_t *h, float *pl, float *pr)
+{
+    fx_t *f = &h->fx;
+    float l = *pl, r = *pr;
     if (f->eq_on) {
         l += f->dc; r += f->dc;
         for (int i = 0; i < 3; i++) { l = bq_run(&f->bq[i], 0, l); r = bq_run(&f->bq[i], 1, r); }
     }
-
-    /* delay: the time glides, as on a tape echo; tone and a gentle high-pass in the feedback */
-    f->dmix += (P[P_DLY_MIX] - f->dmix) * 0.002f;
-    f->dtime += (dtarget - f->dtime) * 0.0005f;
-    {
-        const float rp = (float)f->dw - f->dtime;
-        const float fl = floorf(rp), fr = rp - fl;
-        const uint32_t i0 = (uint32_t)(int32_t)fl & FX_DLY_MASK, i1 = (i0 + 1) & FX_DLY_MASK;
-        const float yl = f->dl[i0] + (f->dl[i1] - f->dl[i0]) * fr;
-        const float yr = f->dr[i0] + (f->dr[i1] - f->dr[i0]) * fr;
-        const float fb = P[P_DLY_FDBK];
-        f->dlp[0] += (yl - f->dlp[0]) * tone_a; f->dlp[1] += (yr - f->dlp[1]) * tone_a;
-        f->dhp[0] += (f->dlp[0] - f->dhp[0]) * hp_a; f->dhp[1] += (f->dlp[1] - f->dhp[1]) * hp_a;
-        const float tl = f->dlp[0] - f->dhp[0], tr = f->dlp[1] - f->dhp[1];
-        float wl, wr;
-        if (P[P_DLY_PING] > 0.5f) { wl = 0.5f * (l + r) + fb * tr; wr = fb * tl; }
-        else { wl = l + fb * tl; wr = r + fb * tr; }
-        f->dl[f->dw & FX_DLY_MASK] = soft_clip(wl) + f->dc;
-        f->dr[f->dw & FX_DLY_MASK] = soft_clip(wr) + f->dc;
-        f->dw++;
-        const float m = f->dmix, dry = m < 0.5f ? 1.0f : 2.0f * (1.0f - m), wet = m > 0.5f ? 1.0f : 2.0f * m;
-        l = l * dry + yl * wet;
-        r = r * dry + yr * wet;
-    }
-
     heads_frame(h, &l, &r);
-
-    if (!f->rev_idle) {
-        f->rmix += (P[P_REV_MIX] - f->rmix) * 0.002f;
-        float x = 0.25f * (l + r) + f->dc;
-        const uint32_t aw = f->ap_w++;
-        for (int k = 0; k < FX_AP_N; k++) {                           /* input diffusion */
-            float *b = f->ap[k];
-            const float d = b[(aw - f->ap_len[k]) & (FX_AP_LEN - 1)];
-            const float w = x + 0.6f * d;
-            b[aw & (FX_AP_LEN - 1)] = w;
-            x = d - 0.6f * w;
-        }
-        float o[FX_REV_N];
-        const uint32_t rw = f->rw++;
-        for (int i = 0; i < FX_REV_N; i++) {
-            const float y = f->line[i][(rw - f->line_len[i]) & (FX_REV_LEN - 1)];
-            f->rlp[i] += (y - f->rlp[i]) * f->rdamp;
-            o[i] = f->rlp[i];
-        }
-        float m[FX_REV_N];                                            /* 8-point Hadamard */
-        for (int i = 0; i < FX_REV_N; i++) m[i] = o[i];
-        for (int s = 1; s < FX_REV_N; s <<= 1)
-            for (int i = 0; i < FX_REV_N; i += s << 1)
-                for (int j = i; j < i + s; j++) { const float a = m[j], b = m[j + s]; m[j] = a + b; m[j + s] = a - b; }
-        static const float k_in_sign[FX_REV_N] = { 1, 1, -1, 1, -1, -1, 1, -1 };
-        for (int i = 0; i < FX_REV_N; i++)
-            f->line[i][rw & (FX_REV_LEN - 1)] = f->rg[i] * m[i] * 0.35355339f + k_in_sign[i] * x;
-        const float revl = 0.6f * (o[0] + o[2] - o[4] + o[6]), revr = 0.6f * (o[1] - o[3] + o[5] + o[7]);
-        const float rm = f->rmix, dry = rm < 0.5f ? 1.0f : 2.0f * (1.0f - rm), wet = rm > 0.5f ? 1.0f : 2.0f * rm;
-        l = l * dry + revl * wet;
-        r = r * dry + revr * wet;
-    }
+    if (!f->rev_idle) reverb_frame(h, &l, &r);
     *pl = l; *pr = r;
 }
 
@@ -1967,11 +2466,62 @@ static void hm_render(hm_t *h, int16_t *out, int frames)
         h->spawn_cd = 0.0;
         h->sel_override = -1;
         h->wave_ver++;
-        if (old) {
-            old->next = atomic_load_explicit(&h->retire, memory_order_relaxed);
-            while (!atomic_compare_exchange_weak_explicit(&h->retire, &old->next, old,
-                                                          memory_order_release, memory_order_relaxed)) {}
+        retire_reel(h, old);
+        h->trim_on = 0;
+        if (atomic_load(&h->tj_state)) h->tj_stale = 1;
+    }
+    /* --- trimming: hand a job to the worker, adopt its result, or take it back --- */
+    if (atomic_exchange(&h->trim_req, 0)) {
+        if (h->trim_on && h->reel && !h->rec_mode && !h->rec_armed && atomic_load(&h->tj_state) == 0 && h->n_splices > 0 && h->trim_sp < h->n_splices) {
+            const uint32_t lo = h->bounds[h->trim_sp], hi = h->bounds[h->trim_sp + 1];
+            if (h->trim_a >= lo && h->trim_b <= hi && h->trim_b > h->trim_a && (h->trim_a > lo || h->trim_b < hi)) {
+                h->tj.src = h->reel; h->tj.lo = lo; h->tj.a = h->trim_a; h->tj.b = h->trim_b; h->tj.hi = hi;
+                h->tj.n_mk = 0;
+                for (int i = 1; i < h->n_splices; i++) h->tj.mk[h->tj.n_mk++] = h->bounds[i];   /* Divide becomes markers */
+                h->tj.sel = h->trim_sp;
+                h->tj_stale = 0;
+                atomic_store_explicit(&h->tj_state, 1, memory_order_release);
+            }
         }
+        h->trim_on = 0;
+    }
+    {
+        reel_t *tr = atomic_exchange_explicit(&h->trim_out, NULL, memory_order_acquire);
+        if (tr) {
+            atomic_store(&h->tj_state, 0);
+            if (h->tj_stale || h->reel != h->tj.src || h->rec_mode) retire_reel(h, tr);
+            else {
+                reel_t *old = h->reel;
+                undo_clear(h);                                     /* earlier edits refer to the old reel */
+                undo_t *u = &h->undo[0];
+                u->n = h->n_mk; memcpy(u->mk, h->mk, sizeof h->mk); u->frames = old->frames; u->reel = old;
+                u->ssrc = (int)h->base[P_SPLICE_SRC];
+                h->undo_n = 1;
+                for (int i = 0; i < HM_MAX_GENES; i++) h->genes[i].active = 0;
+                h->reel = tr;
+                h->n_mk = tr->n_markers;
+                memcpy(h->mk, tr->markers, sizeof(uint32_t) * (size_t)tr->n_markers);
+                markers_changed(h);
+                h->sel_override = h->tj.sel;
+                h->spawn_cd = 0.0;
+                h->wave_ver++;
+            }
+        }
+    }
+    if (atomic_exchange(&h->undo_reel_req, 0) && h->undo_n > 0 && h->undo[h->undo_n - 1].reel && !h->rec_mode) {
+        undo_t *u = &h->undo[--h->undo_n];
+        reel_t *cur = h->reel;
+        for (int i = 0; i < HM_MAX_GENES; i++) h->genes[i].active = 0;
+        h->reel = u->reel; u->reel = NULL;
+        h->n_mk = u->n; memcpy(h->mk, u->mk, sizeof h->mk);
+        h->p[P_SPLICE_SRC] = h->base[P_SPLICE_SRC] = (float)u->ssrc;
+        h->bounds_dirty = 1;
+        publish_markers(h);
+        atomic_fetch_add_explicit(&h->state_gen, 1, memory_order_relaxed);
+        h->sel_override = h->sel_splice;
+        h->spawn_cd = 0.0;
+        h->wave_ver++;
+        retire_reel(h, cur);
     }
     if (atomic_load_explicit(&h->mk_res_ready, memory_order_acquire)) {           /* transient detection result */
         if (!h->rec_mode && h->reel) {
@@ -2012,15 +2562,17 @@ static void hm_render(hm_t *h, int16_t *out, int frames)
         h->since_tick += frames;
         for (int i = 0; i < ticks; i++) clock_tick(h);
     }
+    mods_block(h, frames);
 
-    const int16_t *in16 = (HM_SOLO && g_host && g_host->mapped_memory)
+    const int16_t *in16 = (g_host && g_host->mapped_memory)
                               ? (const int16_t *)(g_host->mapped_memory + g_host->audio_in_offset) : NULL;
 
-    /* nothing to play: stop here, unless Solo can hear its input (then the input
+    /* nothing to play: stop here, unless Heimat can hear its input (then the input
        and the effect tails go on through the effects, reel or no reel) */
     if ((!reel || h->n_splices < 1) && !in16) {
         if (!(reel && h->rec_mode)) {
             h->out_peak *= 0.9f;
+            h->blk_in_pk = h->blk_out_pk = 0.0f;
             memset(out, 0, (size_t)frames * 2 * sizeof(int16_t));
             return;
         }
@@ -2067,12 +2619,10 @@ static void hm_render(hm_t *h, int16_t *out, int frames)
     const int rec_input_only = (int)P[P_REC_SRC] == 1;
     float in_pk = 0.0f, out_pk = 0.0f;
     uint32_t rec_w0 = h->rec_pos;
+    const int rec_was = h->rec_mode;
     const int fx_rec = P[P_FX_REC] > 0.5f;
     fx_block(h);
     heads_block(h);
-    const float fx_dt = fx_delay_target(h);
-    const float fx_tone = 1.0f - expf(-2.0f * (float)M_PI * (800.0f * exp2f(P[P_DLY_TONE] * 4.5f)) / sr);
-    const float fx_hp = 1.0f - expf(-2.0f * (float)M_PI * 40.0f / sr);
 
     for (int n = 0; n < frames; n++) {
         h->bend_cur += (h->bend_target - h->bend_cur) * 0.01f;
@@ -2144,19 +2694,49 @@ static void hm_render(hm_t *h, int16_t *out, int frames)
         }
         const float ml = il * (1.0f - sos) + pl * sos, mr = ir * (1.0f - sos) + pr_ * sos;
         float xl = ml, xr = mr;
-        fx_frame(h, &xl, &xr, fx_dt, fx_tone, fx_hp);
+        fx_frame(h, &xl, &xr);
 
         if (h->rec_mode && reel) {
             float wl = rec_input_only ? il : (fx_rec ? xl : ml), wr = rec_input_only ? ir : (fx_rec ? xr : mr);
             uint32_t w;
+            wl = clampf(wl, -1.0f, 1.0f); wr = clampf(wr, -1.0f, 1.0f);
+            h->rec_t++;
+            const int skipw = h->rec_skip > 0;                  /* Trim Key Noise: the press is not written */
+            if (skipw) h->rec_skip--;
             if (h->rec_mode == REC_NEW) {
-                if (h->rec_pos >= reel->cap) { rec_end(h); goto recorded; }
+                if (h->rec_pos >= reel->cap || (h->rec_target && h->rec_pos - h->rec_start >= h->rec_target)) {
+                    rec_end(h);
+                    goto recorded;
+                }
+                if (skipw) goto recorded;
                 w = h->rec_pos;
+            } else if (h->p[P_REC_HEAD] > 0.5f) {
+                /* Overdub Head = Vari-Speed: the write head runs with the tape,
+                   faster, slower, backwards or not at all; every frame it
+                   passes gets the sound of this moment */
+                const double L = (double)(h->rec_len ? h->rec_len : 1);
+                const double p0 = h->rec_fpos, p1 = p0 + (double)speed;
+                const long k0 = (long)floor(p0), k1 = (long)floor(p1);
+                if (k1 != k0) {
+                    const long d = k1 > k0 ? 1 : -1;
+                    for (long k = k0 + d; !skipw; k += d) {
+                        long q = k % (long)L; if (q < 0) q += (long)L;
+                        ring_push(h, reel, h->rec_lo + (uint32_t)q);
+                        reel->l[h->rec_lo + (uint32_t)q] = wl;
+                        reel->r[h->rec_lo + (uint32_t)q] = wr;
+                        if (k == k1) break;
+                    }
+                }
+                h->rec_fpos = p1 - L * floor(p1 / L);
+                h->rec_pos = (uint32_t)h->rec_fpos;
+                goto recorded;
             } else {
+                if (skipw) { h->rec_pos++; goto recorded; }
                 w = h->rec_lo + (h->rec_pos % (h->rec_len ? h->rec_len : 1));
+                ring_push(h, reel, w);
             }
-            reel->l[w] = clampf(wl, -1.0f, 1.0f);
-            reel->r[w] = clampf(wr, -1.0f, 1.0f);
+            reel->l[w] = wl;
+            reel->r[w] = wr;
             h->rec_pos++;
             if (h->rec_mode == REC_NEW && h->rec_pos > reel->frames) reel->frames = h->rec_pos;
         }
@@ -2168,13 +2748,14 @@ static void hm_render(hm_t *h, int16_t *out, int frames)
         out[2 * n]     = (int16_t)lrintf(L * 32767.0f);
         out[2 * n + 1] = (int16_t)lrintf(R * 32767.0f);
     }
+    h->blk_in_pk = in_pk; h->blk_out_pk = out_pk;
     h->out_peak = out_pk > h->out_peak * 0.9f ? out_pk : h->out_peak * 0.9f;
     h->in_peak  = in_pk  > h->in_peak  * 0.9f ? in_pk  : h->in_peak  * 0.9f;
 
-    if (h->rec_mode && reel) {                         /* keep the peak pyramid in step with what was written */
+    if ((h->rec_mode || rec_was) && reel) {            /* keep the peak pyramid in step with what was written */
         uint32_t a, b;
-        if (h->rec_mode == REC_NEW) { a = rec_w0; b = h->rec_pos; }
-        else { a = h->rec_lo; b = h->rec_lo + h->rec_len; }
+        if (h->rec_mode == REC_CUR || (rec_was == REC_CUR && !h->rec_mode)) { a = h->rec_lo; b = h->rec_lo + h->rec_len; }
+        else { a = rec_w0; b = h->rec_mode == REC_NEW ? h->rec_pos : reel->frames; }
         if (b > reel->frames) b = reel->frames;
         if (b > a) for (uint32_t k = a / HM_PK_BLOCK; k <= (b - 1) / HM_PK_BLOCK && k < reel->pk_n; k++) pk_block(reel, k);
         h->wave_ver++;
@@ -2195,9 +2776,10 @@ static void *v2_create_instance(const char *module_dir, const char *json_default
     if (!h) return NULL;
     h->sr = (g_host && g_host->sample_rate > 0) ? (float)g_host->sample_rate : 44100.0f;
     h->rng = 0x2545F491u;
+    h->ring = calloc(HM_RING, sizeof *h->ring);              /* without it, overdubs just keep their last frames */
     h->sel_override = -1;
     h->view_b = 0;
-    for (int i = 0; i < P_COUNT; i++) h->p[i] = g_params[i].def;
+    for (int i = 0; i < P_COUNT; i++) h->p[i] = h->base[i] = g_params[i].def;
     fx_init(h);
     heads_init(h);
     atomic_init(&h->incoming, NULL);
@@ -2214,13 +2796,13 @@ static void *v2_create_instance(const char *module_dir, const char *json_default
     atomic_init(&h->state_gen, 0);
     atomic_init(&h->restore_ready, 0);
     h->bounds_dirty = 1;
-    if (HM_SOLO) { h->p[P_PAD_MODE] = PAD_PITCH; h->p[P_PLAY_MODE] = PLAY_MOMENTARY; }
+    h->p[P_PAD_MODE] = h->base[P_PAD_MODE] = PAD_PITCH; h->p[P_PLAY_MODE] = h->base[P_PLAY_MODE] = PLAY_MOMENTARY;
     if (pthread_create(&h->th, NULL, worker_main, h) == 0) h->th_started = 1;
     if (json_defaults) {
         char path[HM_PATH_MAX];
         if (json_str(json_defaults, "sample_path", path, sizeof path) == 0 && path[0]) request_load(h, path);
     }
-    if (HM_SOLO && h->cur_path[0] == 0) request_load(h, "");              /* start with an empty reel */
+    if (h->cur_path[0] == 0) request_load(h, "");              /* start with an empty reel */
     return h;
 }
 
@@ -2236,6 +2818,9 @@ static void v2_destroy_instance(void *instance)
     reel_t *p = atomic_exchange(&h->retire, NULL);
     while (p) { reel_t *n = p->next; free_reel(p); p = n; }
     heads_free(h);
+    for (int i = 0; i < h->undo_n; i++) free_reel(h->undo[i].reel);
+    free_reel(atomic_exchange(&h->trim_out, NULL));
+    free(h->ring);
     free(h);
 }
 
@@ -2291,7 +2876,7 @@ static void v2_set_param(void *instance, const char *key, const char *val)
     if (strcmp(key, "state") == 0) { apply_state_json(h, val); return; }
     if (strcmp(key, "all_notes_off") == 0) { all_notes_off(h); return; }
 
-    /* editing and transport commands (used by the Solo UI) */
+    /* editing and transport commands (used by the on-screen UI) */
     if (strcmp(key, "rec_cur") == 0)  { rec_request(h, REC_CUR); return; }
     if (strcmp(key, "rec_new") == 0)  { rec_request(h, REC_NEW); return; }
     if (strcmp(key, "rec_stop") == 0) { rec_stop_request(h); return; }
@@ -2332,6 +2917,35 @@ static void v2_set_param(void *instance, const char *key, const char *val)
         h->view_b = c ? parse_u32(c + 1) : 0;
         return;
     }
+    if (strcmp(key, "trim_set") == 0) {                                     /* "a,b": keep only a..b of the selected splice */
+        if (!h->reel || h->rec_mode || h->n_splices < 1) return;
+        const int sp = clampi(h->sel_splice, 0, h->n_splices - 1);
+        const uint32_t lo = h->bounds[sp], hi = h->bounds[sp + 1];
+        const char *c = strchr(val, ',');
+        if (!c || hi - lo < HM_TRIM_MIN) return;
+        uint32_t a = parse_u32(val), b = parse_u32(c + 1);
+        if (a < lo) a = lo;
+        if (a > hi - HM_TRIM_MIN) a = hi - HM_TRIM_MIN;
+        if (b > hi) b = hi;
+        if (b < a + HM_TRIM_MIN) b = a + HM_TRIM_MIN;
+        const int fresh = !h->trim_on || h->trim_sp != sp;
+        h->trim_a = a; h->trim_b = b; h->trim_sp = sp; h->trim_on = 1;
+        if (fresh) retrigger(h);                                            /* start hearing the preview at once */
+        return;
+    }
+    if (strcmp(key, "trim_cancel") == 0) { h->trim_on = 0; return; }
+    if (strcmp(key, "trim_apply") == 0)  { atomic_store(&h->trim_req, 1); return; }
+    if (strcmp(key, "mod_set") == 0) {                                      /* "source key amount" */
+        int src; char k[64]; float amt;
+        if (sscanf(val, "%d %63s %f", &src, k, &amt) == 3) mod_route_set(h, src, param_index(k), amt);
+        return;
+    }
+    if (strcmp(key, "mod_clear") == 0) {                                    /* "all", a source 0-3, or a key */
+        if (strcmp(val, "all") == 0) mod_routes_clear(h, -1);
+        else if (val[0] >= '0' && val[0] <= '9') mod_routes_clear(h, atoi(val));
+        else { int t = param_index(val); if (t >= 0) mod_routes_clear(h, 100 + t); }
+        return;
+    }
     if (strcmp(key, "organize") == 0) h->sel_override = -1;                    /* the knob takes over again */
 
     int i = param_index(key);
@@ -2342,63 +2956,7 @@ static void v2_set_param(void *instance, const char *key, const char *val)
     set_param_value(h, i, f);
 }
 
-static int get_chain_params(char *buf, int buf_len)
-{
-    jb_t j = { buf, buf_len, 0, 0 };
-    jb_add(&j, "[{\"key\":\"sample_path\",\"name\":\"Reel (WAV file)\",\"type\":\"filepath\","
-               "\"root\":\"/data/UserData\",\"start_path\":\"/data/UserData/UserLibrary/Samples\","
-               "\"filter\":\".wav\",\"default\":\"\"}");
-    for (int i = 0; i < P_COUNT; i++) {
-        const pdef_t *d = &g_params[i];
-        jb_add(&j, ",{\"key\":\"%s\",\"name\":\"%s\",\"short_name\":\"%s\"", d->key, d->name, d->sname);
-        if (d->type == T_ENUM) {
-            jb_add(&j, ",\"type\":\"enum\",\"options\":[");
-            for (int o = 0; o < d->nopts; o++) jb_add(&j, "%s\"%s\"", o ? "," : "", d->opts[o]);
-            jb_add(&j, "],\"default\":%d}", (int)d->def);
-        } else if (d->type == T_INT) {
-            jb_add(&j, ",\"type\":\"int\",\"min\":%d,\"max\":%d,\"step\":1,\"default\":%d}", (int)d->min, (int)d->max, (int)d->def);
-        } else {
-            jb_add(&j, ",\"type\":\"float\",\"min\":%g,\"max\":%g,\"step\":%g,\"default\":%g}", d->min, d->max, d->step, d->def);
-        }
-    }
-    jb_add(&j, "]");
-    return j.ovf ? -1 : j.len;
-}
-
-static int get_ui_hierarchy(char *buf, int buf_len)
-{
-    static const char *hh =
-        "{\"modes\":null,\"levels\":{"
-        "\"root\":{\"name\":\"Heimat\",\"children\":null,"
-            "\"knobs\":[\"gene_size\",\"slide\",\"morph\",\"vari_speed\",\"organize\",\"volume\",\"pad_mode\",\"play_mode\"],"
-            "\"params\":[{\"level\":\"reel\",\"label\":\"Reel / Splices\"},{\"level\":\"play\",\"label\":\"Play / Pads\"},"
-            "{\"level\":\"micro\",\"label\":\"Micro\"},{\"level\":\"fx\",\"label\":\"Effects\"},{\"level\":\"heads\",\"label\":\"Heads\"},{\"level\":\"chords\",\"label\":\"Morph Chords\"}]},"
-        "\"reel\":{\"name\":\"Reel / Splices\",\"children\":null,"
-            "\"knobs\":[\"splice_source\",\"divide\",\"splice_base\"],"
-            "\"params\":[\"sample_path\",\"splice_source\",\"divide\",\"splice_base\"]},"
-        "\"play\":{\"name\":\"Play / Pads\",\"children\":null,"
-            "\"knobs\":[\"pad_mode\",\"play_mode\",\"release_ms\",\"root_note\",\"octave_transpose\",\"bend_range\",\"organize_mode\"],"
-            "\"params\":[\"pad_mode\",\"play_mode\",\"release_ms\",\"root_note\",\"octave_transpose\",\"bend_range\",\"organize_mode\"]},"
-        "\"micro\":{\"name\":\"Micro\",\"children\":null,"
-            "\"knobs\":[\"gene_window\",\"scatter\",\"spread\",\"width\",\"threshold\",\"thr_mode\",\"spread_mode\",\"gene_reverse\"],"
-            "\"params\":[\"gene_window\",\"scatter\",\"spread\",\"spread_mode\",\"gene_reverse\",\"width\",\"threshold\",\"thr_mode\",\"gene_size\",\"morph\"]},"
-        "\"heads\":{\"name\":\"Heads\",\"children\":null,"
-            "\"knobs\":[\"hd_mix\",\"hd_time\",\"hd_heads\",\"hd_spacing\",\"hd_fdbk\",\"hd_reverse\",\"hd_wear\",\"hd_wear_amt\"],"
-            "\"params\":[\"hd_mix\",\"hd_time\",\"hd_heads\",\"hd_spacing\",\"hd_fdbk\",\"hd_reverse\",\"hd_wear\",\"hd_wear_amt\",\"hd_mode\",\"hd_route\",\"hd_freeze\"]},"
-        "\"fx\":{\"name\":\"Effects\",\"children\":null,"
-            "\"knobs\":[\"eq_low\",\"eq_mid\",\"eq_freq\",\"eq_high\",\"dly_time\",\"dly_fdbk\",\"dly_mix\",\"rev_mix\"],"
-            "\"params\":[\"eq_low\",\"eq_mid\",\"eq_freq\",\"eq_high\",\"dly_time\",\"dly_sync\",\"dly_fdbk\",\"dly_tone\",\"dly_mix\",\"dly_ping\",\"rev_decay\",\"rev_damp\",\"rev_mix\"]},"
-        "\"chords\":{\"name\":\"Morph Chords\",\"children\":null,"
-            "\"knobs\":[\"mcr1\",\"mcr2\",\"mcr3\"],"
-            "\"params\":[\"mcr1\",\"mcr2\",\"mcr3\"]}"
-        "}}";
-    int len = (int)strlen(hh);
-    if (len >= buf_len) return -1;
-    memcpy(buf, hh, (size_t)len + 1);
-    return len;
-}
-
-/* flat JSON polled by the Solo UI */
+/* flat JSON polled by the on-screen UI */
 static int get_ui_state(hm_t *h, char *buf, int buf_len)
 {
     const reel_t *r = h->reel;
@@ -2423,6 +2981,12 @@ static int get_ui_state(hm_t *h, char *buf, int buf_len)
         jb_add(&j, ",\"gms\":%.2f,\"dens\":%.2f,\"ff\":%.3f,\"gsp\":%u,\"gsk\":%u",
                dur * 1000.0, dens, dur * dens, h->genes_spawned, h->genes_skipped);
         jb_add(&j, ",\"cpu\":%.3f,\"cpk\":%.3f,\"ovr\":%u", (double)h->load_avg, (double)h->load_pk, h->load_over);
+        const int pl = k_pattern_len[clampi((int)h->p[P_PATTERN], 0, 9)];
+        jb_add(&j, ",\"rtg\":%u,\"rdn\":%u,\"pi\":%u", h->rec_mode == REC_NEW ? h->rec_target : 0u,
+               h->rec_mode == REC_NEW ? h->rec_pos - h->rec_start : 0u, pl ? h->pat_i % (uint32_t)pl : 0u);
+        jb_add(&j, ",\"ton\":%d,\"ta\":%u,\"tb\":%u,\"tjb\":%d", h->trim_on, h->trim_a, h->trim_b, atomic_load(&h->tj_state) != 0);
+        jb_add(&j, ",\"mrv\":%u,\"mo\":[%.3f,%.3f,%.3f,%.3f]", h->mr_ver,
+               (double)h->mod[0], (double)h->mod[1], (double)h->mod[2], (double)h->mod[3]);
     }
     jb_add(&j, ",\"gp\":[");
     int first = 1;
@@ -2482,7 +3046,6 @@ static int get_markers_csv(hm_t *h, char *buf, int buf_len)
     return j.ovf ? -1 : j.len;
 }
 
-#if HM_SOLO
 /* ------------------------------------------------- browser editor (Tool tab)
  * schwung-manager shows web_ui.html in its Remote UI "Tool" tab for an overtake
  * module that answers "module_id". It reads "state" as a FLAT JSON object (every
@@ -2552,10 +3115,10 @@ static int get_remote_state(hm_t *h, char *buf, int buf_len)
         jb_add(&j, "%s%u", first ? "" : ",", (uint32_t)((double)g->lo + rel));
         first = 0;
     }
-    jb_add(&j, "\",\"v_pk\":\"%s\"}", rui_peaks(h));
+    jb_add(&j, "\",\"v_mo\":\"%.3f,%.3f,%.3f,%.3f\"", (double)h->mod[0], (double)h->mod[1], (double)h->mod[2], (double)h->mod[3]);
+    jb_add(&j, ",\"v_pk\":\"%s\"}", rui_peaks(h));
     return j.ovf ? -1 : j.len;
 }
-#endif
 
 static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
 {
@@ -2563,11 +3126,15 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
     if (!h || !key || !buf || buf_len <= 0) return -1;
 
     if (strcmp(key, "name") == 0)         return snprintf(buf, (size_t)buf_len, "Heimat");
-    if (strcmp(key, "ui_hierarchy") == 0) return get_ui_hierarchy(buf, buf_len);
-    if (strcmp(key, "chain_params") == 0) return get_chain_params(buf, buf_len);
     if (strcmp(key, "ui_state") == 0)     return get_ui_state(h, buf, buf_len);
     if (strcmp(key, "view_peaks") == 0)   return get_view_peaks(h, buf, buf_len);
     if (strcmp(key, "markers") == 0)      return get_markers_csv(h, buf, buf_len);
+    if (strcmp(key, "mod_routes") == 0) {
+        jb_t j = { buf, buf_len, 0, 0 };
+        buf[0] = 0;
+        for (int r = 0; r < h->n_mr; r++) jb_add(&j, "%s%s:%d:%.3f", r ? "," : "", g_params[h->mr[r].tgt].key, h->mr[r].src, (double)h->mr[r].amt);
+        return j.ovf ? -1 : j.len;
+    }
     if (strcmp(key, "sample_path") == 0)  return snprintf(buf, (size_t)buf_len, "%s", h->cur_path);
     if (strcmp(key, "save_info") == 0) {
         int st = atomic_load(&h->save_state);
@@ -2580,22 +3147,16 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
         return snprintf(buf, (size_t)buf_len, "state=%d frames=%u splices=%d sr=%d markers=%d truncated=%d resampled=%d",
                         st, r->frames, h->n_splices, (int)h->sr, h->n_mk, r->truncated, r->resampled);
     }
-#if HM_SOLO
     if (strcmp(key, "module_id") == 0)    return snprintf(buf, (size_t)buf_len, "heimat-solo");
     if (strcmp(key, "rui_poll") == 0)
         return snprintf(buf, (size_t)buf_len, "%u:%d:%u:%d", rui_rev(h), h->clk_running, h->clk_running ? h->clk_idx : 0u, (int)lrintf(fx_bpm(h)));
     if (strcmp(key, "state") == 0)        return get_remote_state(h, buf, buf_len);
-#endif
-    if (strcmp(key, "state") == 0) {
-        build_state_json(h, buf, buf_len);
-        return (int)strlen(buf);
-    }
     if (strcmp(key, "dsp_load") == 0)                             /* "average peak over-budget", for the beta */
         return snprintf(buf, (size_t)buf_len, "%.3f %.3f %u", (double)h->load_avg, (double)h->load_pk, h->load_over);
     int i = param_index(key);
     if (i < 0) return -1;
-    if (g_params[i].type == T_FLOAT) return snprintf(buf, (size_t)buf_len, "%.4f", h->p[i]);
-    return snprintf(buf, (size_t)buf_len, "%d", (int)h->p[i]);
+    if (g_params[i].type == T_FLOAT) return snprintf(buf, (size_t)buf_len, "%.4f", h->base[i]);
+    return snprintf(buf, (size_t)buf_len, "%d", (int)h->base[i]);
 }
 
 static int v2_get_error(void *instance, char *buf, int buf_len)

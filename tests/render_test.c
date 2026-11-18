@@ -20,6 +20,7 @@ static host_api_v1_t g_h;
 static plugin_api_v2_t *api;
 static char g_dir[256];
 
+#define GK24 0.3547f                 /* a gene of about half a second on a 4 s splice */
 static int g_fail = 0;
 #define CHECK(cond, ...) do { int ok_ = (cond); printf("  [%s] ", ok_ ? "ok" : "FAIL"); \
     printf(__VA_ARGS__); printf("\n"); if (!ok_) g_fail++; } while (0)
@@ -202,7 +203,6 @@ static double g_in_freq = 0, g_in_amp = 0, g_in_ph = 0;
 static double g_midi_bpm = 0, g_midi_acc = 0;
 static int mock_clock_status(void) { return g_clk_run ? MOVE_CLOCK_STATUS_RUNNING : MOVE_CLOCK_STATUS_STOPPED; }
 static double mock_beat(void) { return g_beat; }
-static float mock_bpm150(void) { return 150.0f; }
 static void rt_msg(void *in, int st) { uint8_t m = (uint8_t)st; api->on_midi(in, &m, 1, 0); }
 
 static void feed_block(void *in)
@@ -537,7 +537,7 @@ int main(int argc, char **argv)
             setp(in, "pad_mode", "Drone"); setf(in, "gene_size", 0.5); setf(in, "vari_speed", k ? 1.0 : 0.5);
             key_on(in, 60); blocks(in, 0.6, NULL);
             rec_t r; rec_init(&r, 1.2); blocks(in, 1.0, &r);
-            double T = tmax * pow(tmin / tmax, (0.5 - 0.005) / 0.995) * SR;
+            double T = gene_seconds(0.5f, tmax) * SR; (void)tmin;
             double expect = T - HM_FADE_CLASSIC;
             int lag = autocorr_peak(r.L, r.n, (int)(expect * 0.7), (int)(expect * 1.3));
             periods[k] = lag;
@@ -703,12 +703,11 @@ int main(int argc, char **argv)
     {
         void *a = inst_with("tones.wav", 1);
         setp(a, "splice_source", "Markers"); setp(a, "pad_mode", "Splice"); setf(a, "morph", 0.66); setf(a, "mcr2", -1.5); setp(a, "gene_window", "Smooth");
-        static char st[16384], cp[16384], ui[4096];
+        static char st[16384], cp[16384];
         int ls = api->get_param(a, "state", st, sizeof st);
-        int lc = api->get_param(a, "chain_params", cp, sizeof cp);
-        int lu = api->get_param(a, "ui_hierarchy", ui, sizeof ui);
-        printf("      state %d byte, chain_params %d byte, ui_hierarchy %d byte\n", ls, lc, lu);
-        CHECK(ls > 0 && lc > 0 && lu > 0, "get_param restituisce state / chain_params / ui_hierarchy");
+        int lc = api->get_param(a, "ui_hierarchy", cp, sizeof cp);
+        printf("      state %d byte\n", ls);
+        CHECK(ls > 0 && lc <= 0, "get_param restituisce lo state; le pagine del modulo per la traccia (sospeso) non ci sono piu'");
         void *b = new_inst();
         setp(b, "state", st);
         int16_t o[BLK * 2];
@@ -719,12 +718,10 @@ int main(int argc, char **argv)
             struct timespec ts = { 0, 2000000 }; nanosleep(&ts, NULL);
         }
         static char st2[16384]; api->get_param(b, "state", st2, sizeof st2);
-        { char *c1 = strstr(st, ",\"rev\""), *c2 = strstr(st2, ",\"rev\""); if (c1) *c1 = 0; if (c2) *c2 = 0; }   /* Solo: the live view follows */
+        { char *c1 = strstr(st, ",\"rev\""), *c2 = strstr(st2, ",\"rev\""); if (c1) *c1 = 0; if (c2) *c2 = 0; }   /* the live view follows */
         CHECK(strcmp(st, st2) == 0, "round-trip dello stato (percorso del file compreso) identico");
         char info[200]; api->get_param(b, "reel_info", info, sizeof info);
         CHECK(strstr(info, "splices=4") != NULL, "il reel dello stato salvato si ricarica da solo (%s)", info);
-        FILE *f = fopen("/tmp/heimat_chain_params.json", "w"); fputs(cp, f); fclose(f);
-        f = fopen("/tmp/heimat_ui_hierarchy.json", "w"); fputs(ui, f); fclose(f);
         api->destroy_instance(a); api->destroy_instance(b);
     }
 
@@ -758,7 +755,6 @@ int main(int argc, char **argv)
         api->destroy_instance(in);
     }
 
-#if HM_SOLO
     /* --------------------------------------------------------------- 16 */
     printf("\n16. Registrazione in un nuovo splice (l'uscita modulata) e annullamento\n");
     {
@@ -856,7 +852,6 @@ int main(int argc, char **argv)
         CHECK(ui_num(in, "rec") == 0 && fabs(fr - SR) < 400, "durata = esattamente un intervallo di clock: %.0f frame (atteso 44100)", fr);
         g_in_amp = 0; api->destroy_instance(in);
     }
-#endif
 
     /* --------------------------------------------------------------- 20 */
     printf("\n20. Marker a mano: aggiungi, sposta, elimina, svuota, dividi, annulla\n");
@@ -966,12 +961,12 @@ int main(int argc, char **argv)
     /* --------------------------------------------------------------- 24 */
     printf("\n24. Clock: Gene Shift, Time Stretch (interno, MIDI, Move)\n");
     {
-        const double T = 4.0 * pow(HM_GENE_MIN_SEC / 4.0, (0.2352 - 0.005) / 0.995);
+        const double T = gene_seconds(GK24, 4.0);
         printf("      gene = %.3f s su un file a gradini di 0.5 s (200, 300 ... 900 Hz)\n", T);
         /* Gene Shift, internal clock, tick every second */
         {
             void *in = new_inst(); mkpath(p, sizeof p, "steps.wav"); load_wait(in, p, 10.0);
-            setp(in, "pad_mode", "Drone"); setf(in, "gene_size", 0.2352); setf(in, "morph", 0.18);
+            setp(in, "pad_mode", "Drone"); setf(in, "gene_size", GK24); setf(in, "morph", 0.18);
             setp(in, "clock_source", "Internal"); setf(in, "bpm", 120); setp(in, "clock_div", "1/2"); setp(in, "clock_mode", "Gene Shift");
             key_on(in, 60);
             double f[3];
@@ -982,7 +977,7 @@ int main(int argc, char **argv)
         /* Time Stretch: the start point glides with the clock */
         {
             void *in = new_inst(); mkpath(p, sizeof p, "steps.wav"); load_wait(in, p, 10.0);
-            setp(in, "pad_mode", "Drone"); setf(in, "gene_size", 0.2352); setf(in, "morph", 0.55);
+            setp(in, "pad_mode", "Drone"); setf(in, "gene_size", GK24); setf(in, "morph", 0.55);
             setp(in, "clock_source", "Internal"); setf(in, "bpm", 120); setp(in, "clock_div", "1/2"); setp(in, "clock_mode", "Time Stretch");
             key_on(in, 60);
             double f[3];
@@ -995,7 +990,7 @@ int main(int argc, char **argv)
         /* MIDI clock: 24 pulses per beat */
         {
             void *in = new_inst(); mkpath(p, sizeof p, "steps.wav"); load_wait(in, p, 10.0);
-            setp(in, "pad_mode", "Drone"); setf(in, "gene_size", 0.2352); setf(in, "morph", 0.18);
+            setp(in, "pad_mode", "Drone"); setf(in, "gene_size", GK24); setf(in, "morph", 0.18);
             setp(in, "clock_source", "MIDI"); setp(in, "clock_div", "1/4"); setp(in, "clock_mode", "Gene Shift");
             rt_msg(in, 0xFA); g_midi_bpm = 120; g_midi_acc = 0;
             key_on(in, 60);
@@ -1008,7 +1003,7 @@ int main(int argc, char **argv)
         /* Move transport via the host */
         {
             void *in = new_inst(); mkpath(p, sizeof p, "steps.wav"); load_wait(in, p, 10.0);
-            setp(in, "pad_mode", "Drone"); setf(in, "gene_size", 0.2352);
+            setp(in, "pad_mode", "Drone"); setf(in, "gene_size", GK24);
             setp(in, "clock_source", "Move"); setp(in, "clock_div", "1/4"); setp(in, "clock_mode", "Gene Shift");
             g_beat = 0; g_bpm_mock = 120; g_clk_run = 0;
             blocks(in, 0.5, NULL);
@@ -1032,7 +1027,6 @@ int main(int argc, char **argv)
         CHECK(len > 0 && len < 600 && js[0] == '{' && js[len - 1] == '}', "ui_state e' un JSON compatto");
         api->destroy_instance(in);
     }
-#if HM_SOLO
     {
         /* recording up to the capacity of the reel stops by itself */
         void *in = new_inst(); wait_blank(in);
@@ -1065,7 +1059,6 @@ int main(int argc, char **argv)
         api->destroy_instance(b);
         setenv("HEIMAT_NO_STATE", "1", 1);
     }
-#endif
 
 
     /* --------------------------------------------------------------- 27 */
@@ -1112,7 +1105,7 @@ int main(int argc, char **argv)
         double cv[2];
         for (int k = 0; k < 2; k++) {
             void *in = inst_with("noise.wav", 1);
-            setp(in, "pad_mode", "Drone"); setf(in, "gene_size", 0.45); setf(in, "morph", 0.0); setf(in, "scatter", k ? 0.8 : 0.0);
+            setp(in, "pad_mode", "Drone"); setf(in, "gene_size", 0.5650); setf(in, "morph", 0.0); setf(in, "scatter", k ? 0.8 : 0.0);
             key_on(in, 60); blocks(in, 0.4, NULL);
             rec_t r; rec_init(&r, 4.2); blocks(in, 4.0, &r);
             int st[128], ln[128]; int ng = find_genes(r.L, r.n, st, ln, 128);
@@ -1127,7 +1120,7 @@ int main(int argc, char **argv)
         int distinct[2];
         for (int k = 0; k < 2; k++) {
             void *in = inst_with("steps.wav", 1);
-            setp(in, "pad_mode", "Drone"); setf(in, "gene_size", 0.40); setf(in, "slide", 0.55); setf(in, "morph", 0.18); setf(in, "scatter", k ? 1.0 : 0.0);
+            setp(in, "pad_mode", "Drone"); setf(in, "gene_size", 0.5193); setf(in, "slide", 0.55); setf(in, "morph", 0.18); setf(in, "scatter", k ? 1.0 : 0.0);
             key_on(in, 60); blocks(in, 0.3, NULL);
             int seen[8] = { 0 };
             for (int w = 0; w < 40; w++) {
@@ -1182,7 +1175,7 @@ int main(int argc, char **argv)
         const char *mode[3] = { "Off", "Loud", "Quiet" };
         for (int k = 0; k < 3; k++) {
             void *in = inst_with("bursts.wav", 1);
-            setp(in, "pad_mode", "Drone"); setf(in, "gene_size", 0.40); setf(in, "morph", 0.18); setf(in, "scatter", 1.0); setf(in, "slide", 0.5);
+            setp(in, "pad_mode", "Drone"); setf(in, "gene_size", 0.5193); setf(in, "morph", 0.18); setf(in, "scatter", 1.0); setf(in, "slide", 0.5);
             setp(in, "thr_mode", mode[k]); setf(in, "threshold", 0.5);
             key_on(in, 60); blocks(in, 0.2, NULL);
             rec_t r; rec_init(&r, 6.2); blocks(in, 6.0, &r);
@@ -1201,7 +1194,7 @@ int main(int argc, char **argv)
         void *in = inst_with("noise.wav", 1);
         setp(in, "pad_mode", "Drone"); setf(in, "gene_size", 0.5);
         key_on(in, 60); blocks(in, 0.5, NULL);
-        const double T = 4.0 * pow(HM_GENE_MIN_SEC / 4.0, (0.5 - 0.005) / 0.995), L = T * SR;
+        const double T = gene_seconds(0.5f, 4.0), L = T * SR;
         struct { double m; double sp; const char *what; } C[3] = { { 0.0, L * 1.5, "rada" }, { 0.18, L - HM_FADE_CLASSIC, "coperta" }, { 1.0, (L - HM_FADE_CLASSIC) / 4.0, "piena" } };
         for (int k = 0; k < 3; k++) {
             setf(in, "morph", C[k].m); blocks(in, 0.1, NULL);
@@ -1237,15 +1230,15 @@ int main(int argc, char **argv)
         void *a = inst_with("noise.wav", 1), *b = inst_with("noise.wav", 1);
         void *in2[2] = { a, b };
         for (int k = 0; k < 2; k++) { setp(in2[k], "pad_mode", "Drone"); setf(in2[k], "gene_size", 0.4); setf(in2[k], "morph", 0.6); key_on(in2[k], 60); }
-        setf(b, "eq_low", 12); setf(b, "eq_high", -9); setf(b, "dly_mix", 0.7); setf(b, "rev_mix", 0.6);
+        setf(b, "eq_low", 12); setf(b, "eq_high", -9); setf(b, "rev_mix", 0.6); setf(b, "rev_tilt", 0.5); setf(b, "rev_depth", 0.95);
         blocks(a, 1.0, NULL); blocks(b, 1.0, NULL);
-        setf(b, "eq_low", 0); setf(b, "eq_high", 0); setf(b, "dly_mix", 0); setf(b, "rev_mix", 0);
+        setf(b, "eq_low", 0); setf(b, "eq_high", 0); setf(b, "rev_mix", 0); setf(b, "rev_tilt", 0); setf(b, "rev_depth", 0);
         blocks(a, 1.0, NULL); blocks(b, 1.0, NULL);
         rec_t ra, rb; rec_init(&ra, 1.1); rec_init(&rb, 1.1);
         blocks(a, 1.0, &ra); blocks(b, 1.0, &rb);
         int diff = 0; for (int i = 0; i < ra.n; i++) if (ra.L[i] != rb.L[i] || ra.R[i] != rb.R[i]) diff++;
         CHECK(diff == 0 && H(b)->fx.rev_idle == 1 && H(b)->fx.eq_on == 0,
-              "dopo aver riportato EQ, Delay e Reverb a zero l'uscita torna identica (%d campioni diversi), riverbero e EQ spenti", diff);
+              "dopo aver riportato EQ e Reverb a zero l'uscita torna identica (%d campioni diversi), riverbero e EQ spenti", diff);
         rec_free(&ra); rec_free(&rb); api->destroy_instance(a); api->destroy_instance(b);
     }
 
@@ -1269,7 +1262,7 @@ int main(int argc, char **argv)
             for (int i = 0; i < N; i++) {
                 if (i % BLK == 0) fx_block(h);
                 float l = x[i], r = x[i];
-                fx_frame(h, &l, &r, fx_delay_target(h), 0.5f, 0.005f);
+                fx_frame(h, &l, &r);
                 y[i] = l;
             }
             e[k][0] = band_e(y, N, 70, 20); e[k][1] = band_e(y, N, 1000, 200); e[k][2] = band_e(y, N, 12000, 2000);
@@ -1290,40 +1283,91 @@ int main(int argc, char **argv)
 #define WIN(x, a, b) rms_db((x) + (int)((a) * SR), (int)(((b) - (a)) * SR))
 
     /* --------------------------------------------------------------- 34 */
-    printf("\n34. FX: delay - tempo libero, feedback, ping-pong e sincrono al tempo\n");
+    printf("\n34. FX: riverbero - pre-delay, dimensione, decadimento infinito, tilt, modulazione\n");
     {
-        void *in = inst_with("burst.wav", 1);
-        BLIP_SETUP(in);
-        setf(in, "dly_time", 300); setf(in, "dly_fdbk", 0.5); setf(in, "dly_mix", 0.5); setf(in, "dly_tone", 1.0);
-        blocks(in, 0.3, NULL);
-        rec_t r; rec_init(&r, 1.6);
-        key_on(in, 60); blocks(in, 0.1, &r); key_off(in, 60); blocks(in, 1.4, &r);
-        double dry = WIN(r.L, 0.02, 0.09), gap = WIN(r.L, 0.16, 0.28), e1 = WIN(r.L, 0.32, 0.39), e2 = WIN(r.L, 0.62, 0.69), e3 = WIN(r.L, 0.92, 0.99);
-        printf("      dBFS: suono %.1f, pausa %.1f, eco1 %.1f, eco2 %.1f, eco3 %.1f\n", dry, gap, e1, e2, e3);
-        CHECK(gap < -60 && e1 > dry - 9 && e1 < dry + 1, "la prima eco arriva dopo 300 ms (la pausa prima e' silenzio)");
-        CHECK(fabs((e1 - e2) - 6.0) < 1.5 && fabs((e2 - e3) - 6.0) < 1.5, "feedback 0.5: ogni eco circa -6 dB (%.1f, %.1f)", e1 - e2, e2 - e3);
-        rec_free(&r);
+        /* the reverb alone: a click straight through the chain, wet only */
+        const int N = 6 * SR;
+        float *y = (float *)malloc(sizeof(float) * N), *z = (float *)malloc(sizeof(float) * N);
+#define REV_RUN(setup, out, n_, src) do { void *in_ = new_inst(); hm_t *h_ = H(in_); setf(in_, "rev_mix", 1.0); setup; \
+            for (int i_ = 0; i_ < SR / 2; i_++) { if (i_ % BLK == 0) fx_block(h_); float l_ = 0, r_ = 0; fx_frame(h_, &l_, &r_); } \
+            for (int i_ = 0; i_ < (n_); i_++) { if (i_ % BLK == 0) fx_block(h_); float l_ = (src), r_ = l_; fx_frame(h_, &l_, &r_); (out)[i_] = l_; \
+                if (!isfinite(l_) || !isfinite(r_)) nan_++; } \
+            api->destroy_instance(in_); } while (0)
+        int nan_ = 0;
+        /* pre-delay: nothing before it, the space after */
+        REV_RUN({ setf(in_, "rev_predelay", 200); setf(in_, "rev_size", 0.15); setf(in_, "rev_decay", 0.3); }, y, SR, i_ == 0 ? 1.0f : 0.0f);
+        int on = -1; for (int i = 0; i < SR; i++) if (fabsf(y[i]) > 1e-4f) { on = i; break; }
+        printf("      pre-delay 200 ms: primo suono a %.1f ms\n", on * 1000.0 / SR);
+        CHECK(on > 0.199 * SR && on < 0.215 * SR, "pre-delay 200 ms: prima niente, poi lo spazio (%.1f ms)", on * 1000.0 / SR);
 
-        setp(in, "dly_ping", "On"); blocks(in, 3.0, NULL);
-        rec_init(&r, 1.6);
-        key_on(in, 60); blocks(in, 0.1, &r); key_off(in, 60); blocks(in, 1.4, &r);
-        double l1 = WIN(r.L, 0.32, 0.39), r1 = WIN(r.R, 0.32, 0.39), l2 = WIN(r.L, 0.62, 0.69), r2 = WIN(r.R, 0.62, 0.69);
-        CHECK(l1 > r1 + 30 && r2 > l2 + 30, "ping-pong: prima eco a sinistra (%.1f / %.1f), seconda a destra (%.1f / %.1f)", l1, r1, l2, r2);
-        rec_free(&r);
+        /* Size: a bigger space answers later and, at the same Decay, rings longer */
+        double first[2], tail[2];
+        const double sz[2] = { 0.15, 0.9 };
+        for (int k = 0; k < 2; k++) {
+            REV_RUN({ setf(in_, "rev_predelay", 7); setf(in_, "rev_size", sz[k]); setf(in_, "rev_decay", 0.5); setf(in_, "rev_damp", 0.3); }, y, N, i_ < 64 ? 0.5f : 0.0f);
+            int f1 = -1; double pk = 0; for (int i = 0; i < N; i++) pk = fmax(pk, fabs(y[i]));
+            for (int i = 0; i < N; i++) if (fabs(y[i]) > pk * 0.05) { f1 = i; break; }
+            first[k] = f1 * 1000.0 / SR; tail[k] = rms_db(y + 2 * SR, SR);
+        }
+        printf("      Size 0.15 / 0.9: prima riflessione %.1f / %.1f ms, coda a 2-3 s %.1f / %.1f dB\n", first[0], first[1], tail[0], tail[1]);
+        CHECK(first[1] > first[0] + 15, "uno spazio grande risponde piu' tardi");
+        CHECK(tail[1] > tail[0] + 15, "e, a parita' di Decay, suona piu' a lungo");
 
-        setp(in, "dly_ping", "Off"); setf(in, "bpm", 100); setp(in, "dly_sync", "1/4"); blocks(in, 3.0, NULL);
-        CHECK(fabs(H(in)->fx.dtime - 0.6f * SR) < 2, "sync 1/4 a 100 BPM interni = 600 ms (%.1f ms)", H(in)->fx.dtime / SR * 1000);
-        g_h.get_bpm = mock_bpm150; blocks(in, 3.0, NULL);
-        CHECK(fabs(H(in)->fx.dtime - 0.4f * SR) < 2, "sync 1/4 seguendo il tempo di Move (150 BPM) = 400 ms (%.1f ms)", H(in)->fx.dtime / SR * 1000);
-        g_h.get_bpm = NULL;
-        api->destroy_instance(in);
+        /* Decay at the top: holds */
+        REV_RUN({ setf(in_, "rev_predelay", 7); setf(in_, "rev_size", 0.6); setf(in_, "rev_decay", 1.0); setf(in_, "rev_damp", 0.3); }, y, N, i_ < 2000 ? 0.3f * sinf(i_ * 0.07f) : 0.0f);
+        const double h1 = rms_db(y + 1 * SR, SR / 2), h5 = rms_db(y + (int)(5.5 * SR), SR / 2);
+        printf("      Decay al massimo: livello a 1 s %.1f dB, a 5.5 s %.1f dB\n", h1, h5);
+        CHECK(h1 > -60 && fabs(h5 - h1) < 3.0, "Decay al massimo tiene il suono senza fine (%.1f dB di differenza)", h5 - h1);
+
+        /* Tilt: to the left the lows, to the right the highs */
+        uint32_t sd = 777u;
+        double lo[2], hi[2];
+        for (int k = 0; k < 2; k++) {
+            sd = 777u;
+            REV_RUN({ setf(in_, "rev_tilt", k ? 1.0 : -1.0); setf(in_, "rev_decay", 0.4); }, y, 2 * SR, (sd = sd * 1664525u + 1013904223u, 0.2f * ((float)(sd >> 8) / 8388608.0f - 1.0f)));
+            lo[k] = band_e(y, 2 * SR, 100, 30); hi[k] = band_e(y, 2 * SR, 8000, 1500);
+        }
+        const double tl = 10 * log10((hi[1] / lo[1]) / (hi[0] / lo[0]));
+        printf("      Tilt da -1 a +1: alti contro bassi %+.1f dB\n", tl);
+        CHECK(tl > 30, "Tilt sposta l'equilibrio da bassi cupi ad alti brillanti (%+.1f dB)", tl);
+
+        /* modulation: cyclic and ergodic stay bounded; shimmer adds the octave above */
+        double oct[2];
+        for (int k = 0; k < 2; k++) {
+            REV_RUN({ setf(in_, "rev_size", 0.6); setf(in_, "rev_decay", 0.85); setf(in_, "rev_damp", 0.3); setf(in_, "rev_depth", k ? 1.0 : 0.0); setf(in_, "rev_speed", 0.3); },
+                    y, N, i_ < SR / 2 ? 0.25f * sinf(2.0f * (float)M_PI * 500.0f * i_ / SR) : 0.0f);
+            oct[k] = 10 * log10(band_e(y + 2 * SR, 3 * SR, 1000, 60) / band_e(y + 2 * SR, 3 * SR, 500, 60));
+        }
+        printf("      shimmer: ottava sopra contro fondamentale nella coda %.1f dB (Depth 0) / %.1f dB (Depth +1)\n", oct[0], oct[1]);
+        CHECK(oct[1] > oct[0] + 10, "Depth tutto a destra: compare l'ottava sopra (shimmer)");
+        double pkm = 0;
+        const double dp[3] = { -1.0, 0.5, 1.0 };
+        for (int k = 0; k < 3; k++) {
+            REV_RUN({ setf(in_, "rev_size", 1.0); setf(in_, "rev_decay", 1.0); setf(in_, "rev_damp", 0.0); setf(in_, "rev_depth", dp[k]); setf(in_, "rev_speed", 1.0); },
+                    z, N, i_ < SR ? 0.5f * sinf(i_ * 0.031f) : 0.0f);
+            for (int i = 0; i < N; i++) pkm = fmax(pkm, fabs(z[i]));
+        }
+        printf("      tutto al massimo (cyclic, ergodic, shimmer, decay infinito): picco %.2f\n", pkm);
+        CHECK(nan_ == 0 && pkm < 4.0, "modulazione e decay infinito restano limitati, nessun NaN");
+
+        /* Reverse: the pre-delay played backwards changes the sound, not the level */
+        double ef, er;
+        REV_RUN({ setf(in_, "rev_predelay", 300); setf(in_, "rev_decay", 0.2); setf(in_, "rev_size", 0.2); }, y, SR, i_ < 3000 ? (1.0f - i_ / 3000.0f) * sinf(i_ * 0.05f) : 0.0f);
+        REV_RUN({ setf(in_, "rev_predelay", 300); setf(in_, "rev_decay", 0.2); setf(in_, "rev_size", 0.2); setp(in_, "rev_reverse", "On"); }, z, SR, i_ < 3000 ? (1.0f - i_ / 3000.0f) * sinf(i_ * 0.05f) : 0.0f);
+        ef = rms_db(y, SR); er = rms_db(z, SR);
+        double cf = 0, cr = 0, wf = 0, wr = 0;
+        for (int i = 0; i < SR; i++) { cf += (double)i * y[i] * y[i]; wf += (double)y[i] * y[i]; cr += (double)i * z[i] * z[i]; wr += (double)z[i] * z[i]; }
+        printf("      Reverse: livello %.1f / %.1f dB, baricentro %.0f / %.0f ms\n", ef, er, cf / wf * 1000 / SR, cr / wr * 1000 / SR);
+        CHECK(fabs(ef - er) < 6 && fabs(cf / wf - cr / wr) > 0.01 * SR, "Reverse cambia il tempo del suono (non il livello)");
+#undef REV_RUN
+        free(y); free(z);
     }
 
     /* --------------------------------------------------------------- 35 */
     printf("\n35. FX: riverbero - coda, durata, smorzamento, stereo\n");
     {
         double tail[3], corr = 0;
-        const double decay[3] = { 0.2, 0.8, 0.8 }, damp[3] = { 0.0, 0.0, 1.0 };
+        const double decay[3] = { 0.2, 0.8, 0.8 }, damp[3] = { 0.3, 0.3, 1.0 };
         for (int k = 0; k < 3; k++) {
             void *in = inst_with("burst.wav", 1);
             BLIP_SETUP(in);
@@ -1351,8 +1395,8 @@ int main(int argc, char **argv)
         void *in = inst_with("noise.wav", 1);
         setp(in, "pad_mode", "Drone"); setf(in, "morph", 1.0); setf(in, "gene_size", 0.5); setf(in, "volume", 1.0);
         setf(in, "eq_low", 15); setf(in, "eq_mid", 15); setf(in, "eq_high", 15);
-        setf(in, "dly_fdbk", 0.95); setf(in, "dly_mix", 0.5); setf(in, "dly_tone", 1.0); setf(in, "dly_time", 40);
-        setf(in, "rev_mix", 0.5); setf(in, "rev_decay", 1.0); setf(in, "rev_damp", 0.0);
+        setf(in, "rev_mix", 0.5); setf(in, "rev_decay", 1.0); setf(in, "rev_damp", 0.0); setf(in, "rev_size", 1.0);
+        setf(in, "rev_depth", 1.0); setf(in, "rev_speed", 0.6); setf(in, "rev_tilt", 1.0);
         key_on(in, 60);
         rec_t r; rec_init(&r, 20.1);
         double t0 = now_s(); blocks(in, 20.0, &r); double el = now_s() - t0;
@@ -1360,13 +1404,12 @@ int main(int argc, char **argv)
         double late = WIN(r.L, 18.0, 20.0);
         printf("      20 s renderizzati in %.2f s (%.1f%% del tempo reale su questo computer), livello finale %.1f dBFS\n", el, el / 20.0 * 100.0, late);
         CHECK(bad == 0 && late < 0.0 && late > -40, "nessun NaN, il feedback resta limitato");
-        key_off(in, 60); setf(in, "dly_fdbk", 0.0); setf(in, "rev_mix", 0); setf(in, "dly_mix", 0);
+        key_off(in, 60); setf(in, "rev_mix", 0);
         blocks(in, 1.0, NULL);
         CHECK(H(in)->fx.rev_idle == 1, "riportato il mix a zero il riverbero si ferma e non consuma CPU");
         rec_free(&r); api->destroy_instance(in);
     }
 
-#if HM_SOLO
     /* --------------------------------------------------------------- 37 */
     printf("\n37. FX: registrare attraverso gli effetti (Record Through FX)\n");
     {
@@ -1374,7 +1417,7 @@ int main(int argc, char **argv)
         for (int k = 0; k < 2; k++) {
             void *in = new_inst(); wait_blank(in);
             setf(in, "sos", 0); setp(in, "rec_source", "Mix");
-            setf(in, "dly_time", 400); setf(in, "dly_fdbk", 0); setf(in, "dly_mix", 1.0); setf(in, "dly_tone", 1.0);
+            setf(in, "rev_mix", 1.0); setf(in, "rev_predelay", 400); setf(in, "rev_decay", 0.3); setf(in, "rev_size", 0.3);
             setp(in, "fx_rec", k ? "On" : "Off");
             blocks(in, 1.0, NULL);
             g_in_freq = 330; g_in_amp = 0.3;
@@ -1387,12 +1430,10 @@ int main(int argc, char **argv)
         }
         printf("      rms 0.05-0.25 s / 0.48-0.65 s: senza FX %.3f / %.3f, con FX %.3f / %.3f\n", pre[0], post[0], pre[1], post[1]);
         CHECK(pre[0] > 0.1 && post[0] < 0.001, "Off: nel reel va il suono asciutto (gli effetti restano solo in uscita)");
-        CHECK(pre[1] < 0.001 && post[1] > 0.1, "On: nel reel va il suono con l'eco del delay (400 ms dopo)");
+        CHECK(pre[1] < 0.001 && post[1] > 0.1, "On: nel reel va il suono del riverbero (dopo 400 ms di pre-delay)");
     }
-#endif
 
 
-#if HM_SOLO
     /* --------------------------------------------------------------- 38 */
     printf("\n38. Editor nel browser (Remote UI di Schwung, scheda Tool)\n");
     {
@@ -1422,7 +1463,7 @@ int main(int argc, char **argv)
         api->get_param(in, "rui_poll", p1, sizeof p1); blocks(in, 0.5, NULL); api->get_param(in, "rui_poll", p2, sizeof p2);
         CHECK(strcmp(p1, p2) == 0, "a strumento fermo rui_poll non cambia (%s)", p1);
         setp(in, "splice_source", "Markers"); setp(in, "gene_window", "Tukey"); setf(in, "gene_size", 0.3); setf(in, "morph", 0.62);
-        setf(in, "scatter", 0.3); setf(in, "dly_mix", 0.3); setf(in, "rev_mix", 0.25); setf(in, "eq_low", 4); setf(in, "eq_mid", -5); setf(in, "eq_freq", 1800);
+        setf(in, "scatter", 0.3); setf(in, "rev_size", 0.7); setf(in, "rev_mix", 0.25); setf(in, "eq_low", 4); setf(in, "eq_mid", -5); setf(in, "eq_freq", 1800);
         setp(in, "pad_mode", "Drone"); key_on(in, 60); blocks(in, 0.1, NULL);
         api->get_param(in, "rui_poll", p1, sizeof p1); blocks(in, 0.5, NULL); api->get_param(in, "rui_poll", p2, sizeof p2);
         unsigned r1 = (unsigned)strtoul(p1, NULL, 10), r2 = (unsigned)strtoul(p2, NULL, 10);
@@ -1440,8 +1481,6 @@ int main(int argc, char **argv)
         CHECK(fabsf(mo - 0.4f) < 1e-3f, "lo stato con i campi live si puo' riapplicare: i campi v_ sono ignorati");
         api->destroy_instance(in);
     }
-#endif
-#if HM_SOLO
     /* --------------------------------------------------------------- 39 */
     printf("\n39. HEADS: una rete di testine di lettura sul nastro (dall'ingresso)\n");
     {
@@ -1559,13 +1598,12 @@ int main(int argc, char **argv)
         CHECK(H(in)->hd.idle == 1, "Mix a zero: le testine si fermano e non costano nulla");
         api->destroy_instance(in);
     }
-#endif
     /* --------------------------------------------------------------- 40 */
     printf("\n40. Gene Reverse e Spread Intervals\n");
     {
         void *in = inst_with("sine16m.wav", 1);
         hm_t *h = H(in);
-        setp(in, "pad_mode", "Drone"); setf(in, "gene_size", 0.45); setf(in, "morph", 0.5);
+        setp(in, "pad_mode", "Drone"); setf(in, "gene_size", 0.5650); setf(in, "morph", 0.5);
         key_on(in, 60); blocks(in, 0.3, NULL);
 
         /* count forward and backward genes as they are born */
@@ -1652,7 +1690,12 @@ int main(int argc, char **argv)
             char key[64], type[16]; int nopt = 0;
             if (line[0] == '#' || sscanf(line, "%63s %15s %d", key, type, &nopt) != 3) continue;
             listed++;
+            /* retired in 0.8.0 with the old delay; their values in old sessions are ignored */
+            static const char *const retired[] = { "dly_time", "dly_sync", "dly_fdbk", "dly_tone", "dly_mix", "dly_ping" };
+            int gone = 0;
+            for (size_t q = 0; q < sizeof retired / sizeof *retired; q++) if (!strcmp(key, retired[q])) gone = 1;
             const int i = param_index(key);
+            if (gone) { if (i < 0) kept++; else printf("      %s doveva essere ritirata\n", key); continue; }
             if (i < 0) { printf("      manca la chiave %s\n", key); continue; }
             const pdef_t *d = &g_params[i];
             const char *t = d->type == T_FLOAT ? "float" : d->type == T_INT ? "int" : "enum";
@@ -1661,7 +1704,39 @@ int main(int argc, char **argv)
             kept++;
         }
         if (f) fclose(f);
-        CHECK(listed >= 62 && kept == listed, "le %d chiavi della 0.7.0 esistono ancora, stesso tipo, nessuna opzione persa", listed);
+        CHECK(listed >= 62 && kept == listed, "le %d chiavi della 0.7.0 esistono ancora (tranne le 6 del delay, ritirate), stesso tipo, nessuna opzione persa", listed);
+        /* and from 0.8.0 on, nothing is retired any more */
+        f = fopen("tests/fixtures/params_0.8.0.txt", "r");
+        listed = kept = 0;
+        while (f && fgets(line, sizeof line, f)) {
+            char key[64], type[16]; int nopt = 0;
+            if (line[0] == '#' || sscanf(line, "%63s %15s %d", key, type, &nopt) != 3) continue;
+            listed++;
+            const int i = param_index(key);
+            if (i < 0) { printf("      manca la chiave %s\n", key); continue; }
+            const pdef_t *d = &g_params[i];
+            const char *t = d->type == T_FLOAT ? "float" : d->type == T_INT ? "int" : "enum";
+            if (strcmp(t, type) != 0 || (d->type == T_ENUM && d->nopts < nopt)) { printf("      %s cambiata\n", key); continue; }
+            kept++;
+        }
+        if (f) fclose(f);
+        CHECK(listed == 62 && kept == listed, "le %d chiavi della 0.8.0 esistono tutte, stesso tipo, nessuna opzione persa", listed);
+        /* the newest list names every key there is */
+        f = fopen("tests/fixtures/params_0.12.0.txt", "r");
+        listed = kept = 0;
+        while (f && fgets(line, sizeof line, f)) {
+            char key[64], type[16]; int nopt = 0;
+            if (line[0] == '#' || sscanf(line, "%63s %15s %d", key, type, &nopt) != 3) continue;
+            listed++;
+            const int i = param_index(key);
+            if (i < 0) { printf("      manca la chiave %s\n", key); continue; }
+            const pdef_t *d = &g_params[i];
+            const char *t = d->type == T_FLOAT ? "float" : d->type == T_INT ? "int" : "enum";
+            if (strcmp(t, type) != 0 || (d->type == T_ENUM && d->nopts < nopt)) { printf("      %s cambiata\n", key); continue; }
+            kept++;
+        }
+        if (f) fclose(f);
+        CHECK(listed == P_COUNT && kept == listed, "le %d chiavi della 0.12.0 sono tutte quelle che ci sono", listed);
 
         static const char *const files[3] = { "tests/fixtures/state_0.5.0.json", "tests/fixtures/state_0.6.0.json", "tests/fixtures/state_0.7.0.json" };
         char *js = (char *)malloc(HM_STATE_MAX);
@@ -1714,6 +1789,255 @@ int main(int argc, char **argv)
         char js[2048]; api->get_param(in, "ui_state", js, sizeof js);
         CHECK(strstr(js, "\"cpu\":") && strstr(js, "\"cpk\":") && strstr(js, "\"ovr\":"), "ui_state porta cpu, cpk e ovr alla schermata About");
         api->destroy_instance(in);
+    }
+    /* --------------------------------------------------------------- 43 */
+    printf("\n43. Pattern: il caso che si ripete ogni N geni\n");
+    {
+        void *in = new_inst(); mkpath(p, sizeof p, "tones.wav"); load_wait(in, p, 10.0);
+        hm_t *h = H(in);
+        setp(in, "splice_source", "Markers"); setf(in, "gene_size", 0.5);
+        setf(in, "scatter", 1.0); setf(in, "spread", 7.0); setf(in, "gene_reverse", 0.5); setf(in, "width", 1.0); setf(in, "morph", 0.95);
+        blocks(in, 0.1, NULL);
+        /* one gene at a time, straight from the engine: where it starts, how it sounds, where it sits, what comes next */
+        #define PAT_TAKE(arr, n) do { for (int k_ = 0; k_ < (n); k_++) { \
+            for (int i_ = 0; i_ < HM_MAX_GENES; i_++) h->genes[i_].active = 0; \
+            double sp_ = spawn_gene(h, k_ % 4, 1.0f); \
+            arr[k_][0] = h->genes[0].pos; arr[k_][1] = h->genes[0].pitch; arr[k_][2] = h->genes[0].gl; arr[k_][3] = sp_; } } while (0)
+        double a[16][4], b[16][4], c[16][4];
+        setp(in, "pattern", "4"); seti(in, "pattern_seed", 7); retrigger(h);
+        PAT_TAKE(a, 16);
+        int rep = 1, varied = 0;
+        for (int k = 4; k < 16; k++) for (int q = 0; q < 4; q++) if (fabs(a[k][q] - a[k - 4][q]) > 1e-9) rep = 0;
+        for (int k = 1; k < 4; k++) if (fabs(a[k][0] - a[0][0]) > 1.0) varied++;
+        CHECK(rep && varied == 3, "Pattern 4: inizio, intonazione, posizione e distanza tornano identici ogni 4 geni, e i 4 sono diversi tra loro");
+        retrigger(h); PAT_TAKE(b, 4);
+        CHECK(fabs(b[0][0] - a[0][0]) < 1e-9 && fabs(b[3][3] - a[3][3]) < 1e-9, "dopo un nuovo attacco il Pattern ricomincia dal primo gene");
+        seti(in, "pattern_seed", 8); retrigger(h); PAT_TAKE(c, 4);
+        int diff = 0; for (int k = 0; k < 4; k++) if (fabs(c[k][0] - a[k][0]) > 1.0) diff++;
+        CHECK(diff >= 3, "un altro seme, un'altra frase (%d geni su 4 diversi)", diff);
+        const uint32_t r0 = h->rng;
+        setp(in, "pattern", "Off"); retrigger(h); PAT_TAKE(c, 8);
+        int same = 0; for (int k = 4; k < 8; k++) if (fabs(c[k][0] - c[k - 4][0]) < 1e-9) same++;
+        CHECK(same == 0 && h->rng != r0, "Pattern Off: il caso scorre libero come prima");
+        #undef PAT_TAKE
+        /* and it sounds: a cloud with Pattern on plays */
+        setp(in, "pattern", "8"); setp(in, "pad_mode", "Drone"); key_on(in, 60);
+        rec_t r; rec_init(&r, 1.0); blocks(in, 1.0, &r);
+        CHECK(rms_db(r.L, r.n) > -40.0, "con Pattern la nuvola suona (%.1f dB)", rms_db(r.L, r.n));
+        rec_free(&r);
+        api->destroy_instance(in);
+    }
+    /* --------------------------------------------------------------- 44 */
+    printf("\n44. Nastro da looper: lunghezza fissa, sovraincisione dopo, testina a Vari-Speed\n");
+    {
+        /* Record Length: one bar at 120 BPM, then it stops by itself and plays */
+        void *in = new_inst(); wait_blank(in);
+        g_in_freq = 330; g_in_amp = 0.3;
+        setf(in, "bpm", 120); setf(in, "sos", 0); setp(in, "rec_source", "Input"); setp(in, "rec_length", "1 bar");
+        setp(in, "rec_new", "1"); blocks(in, 3.0, NULL);
+        double fr = ui_num(in, "fr");
+        CHECK(ui_num(in, "rec") == 0 && fabs(fr - 2.0 * SR) <= BLK, "1 bar a 120 BPM: si ferma da sola a %.0f frame (attesi 88200)", fr);
+        api->destroy_instance(in);
+
+        /* After Recording = Overdub: the loop closes and recording goes on over it */
+        in = new_inst(); wait_blank(in); hm_t *h = H(in);
+        setf(in, "bpm", 120); setf(in, "sos", 0); setp(in, "rec_source", "Input"); setp(in, "rec_length", "1 bar"); setp(in, "rec_after", "Overdub");
+        g_in_freq = 330; g_in_amp = 0.3;
+        setp(in, "rec_new", "1"); blocks(in, 2.5, NULL);
+        fr = ui_num(in, "fr");
+        CHECK(ui_num(in, "rec") == REC_CUR && fabs(fr - 2.0 * SR) <= BLK, "a fine battuta passa in sovraincisione sullo stesso loop (%.0f frame)", fr);
+        g_in_freq = 660; blocks(in, 2.2, NULL);
+        setp(in, "rec_stop", "1"); blocks(in, 0.05, NULL);
+        const float *L = h->reel->l; int n = (int)(1.5 * SR);
+        float *tmp = (float *)malloc(sizeof(float) * (size_t)n); for (int i = 0; i < n; i++) tmp[i] = L[(int)(0.2 * SR) + i];
+        double f = peak_freq(tmp, n, 200, 900, 1.0); free(tmp);
+        CHECK(ui_num(in, "rec") == 0 && fabs(ui_num(in, "fr") - fr) < 1 && fabs(f - 660) < 8, "il secondo giro ha scritto sopra il primo (%.0f Hz), lunghezza invariata; stop ferma tutto", f);
+        g_in_amp = 0; api->destroy_instance(in);
+
+        /* Overdub Head = Vari-Speed */
+        in = new_inst(); mkpath(p, sizeof p, "tones.wav"); load_wait(in, p, 10.0); h = H(in);
+        setp(in, "splice_source", "Markers"); setp(in, "pad_mode", "Drone"); setf(in, "organize", 0.35);
+        setf(in, "sos", 0); setp(in, "rec_source", "Input"); setp(in, "rec_head", "Vari-Speed");
+        setf(in, "vari_speed", -0.5);                                            /* -1x: backwards */
+        key_on(in, 60); blocks(in, 0.6, NULL);
+        g_in_amp = 0.0;
+        setp(in, "rec_cur", "1"); blocks(in, 0.1, NULL);
+        const uint32_t lo = h->rec_lo, len = h->rec_len;
+        double p0 = ui_num(in, "rpos"); blocks(in, 0.2, NULL); double p1 = ui_num(in, "rpos");
+        double d = p1 - p0; if (d > len / 2.0) d -= len; if (d < -(double)len / 2.0) d += len;
+        CHECK(fabs(d + 0.2 * SR) < 2 * BLK, "Vari-Speed all'indietro: la testina di scrittura torna indietro (%.0f frame in 0.2 s)", d);
+        setp(in, "rec_stop", "1"); blocks(in, 0.05, NULL);
+        setf(in, "vari_speed", 1.0);                                              /* 2x */
+        blocks(in, 0.4, NULL);
+        setp(in, "rec_cur", "1"); blocks(in, (double)len / SR / 2.0 + 0.15, NULL);
+        setp(in, "rec_stop", "1");
+        float mx = 0; for (uint32_t i = lo; i < lo + len; i++) if (fabsf(h->reel->l[i]) > mx) mx = fabsf(h->reel->l[i]);
+        CHECK(mx < 1e-6f, "a 2x un giro dura mezzo splice e non lascia buchi: tutto lo splice e' stato riscritto (resto %.4f)", mx);
+        setf(in, "vari_speed", 0.0); blocks(in, 0.4, NULL);
+        g_in_freq = 500; g_in_amp = 0.4;
+        setp(in, "rec_cur", "1"); blocks(in, 0.3, NULL); setp(in, "rec_stop", "1");
+        mx = 0; for (uint32_t i = lo; i < lo + len; i++) if (fabsf(h->reel->l[i]) > mx) mx = fabsf(h->reel->l[i]);
+        CHECK(mx < 0.01f, "nastro fermo: la testina non scrive (%.4f)", mx);
+        g_in_amp = 0; api->destroy_instance(in);
+    }
+    /* --------------------------------------------------------------- 45 */
+    printf("\n45. Modulatori: Wave, Random, Follow, Envelope e i loro percorsi\n");
+    {
+        void *in = inst_with("sine16m.wav", 1); hm_t *h = H(in);
+        char b[1024];
+        /* Wave at 1 Hz onto Volume, depth 50%: the engine moves, the knob stays */
+        setf(in, "volume", 0.5); setf(in, "mod_wave_rate", log(50.0) / log(1000.0));
+        setp(in, "mod_set", "0 volume 0.5");
+        float mn = 9, mx = -9; int cross = 0; float prev = 0.5f;
+        for (int k = 0; k < (int)(2.0 * SR / BLK); k++) {
+            blocks(in, (double)BLK / SR, NULL);
+            const float v = h->p[P_VOLUME];
+            if (v < mn) mn = v;
+            if (v > mx) mx = v;
+            if ((prev - 0.5f) * (v - 0.5f) < 0) cross++;
+            prev = v;
+        }
+        api->get_param(in, "volume", b, sizeof b);
+        CHECK(mn < 0.03f && mx > 0.97f && cross >= 3 && cross <= 5 && fabs(atof(b) - 0.5) < 1e-3,
+              "Wave 1 Hz su Volume al 50%%: il volume va da %.2f a %.2f (%d passaggi in 2 s), il knob resta a %.2f", mn, mx, cross, atof(b));
+        api->get_param(in, "mod_routes", b, sizeof b);
+        CHECK(strcmp(b, "volume:0:0.500") == 0, "mod_routes: \"%s\"", b);
+        /* a knob can be turned while modulated: the modulation follows it */
+        setf(in, "volume", 0.2); blocks(in, 0.6, NULL);
+        CHECK(h->p[P_VOLUME] <= 0.7f + 1e-3f && h->base[P_VOLUME] == 0.2f, "girando il knob la modulazione si sposta con lui");
+        setp(in, "mod_set", "0 volume 0");
+        CHECK(h->n_mr == 0 && h->p[P_VOLUME] == 0.2f, "profondita' 0: il percorso sparisce e il controllo torna al knob");
+        setp(in, "mod_set", "0 pad_mode 0.5");
+        CHECK(h->n_mr == 0, "le scelte (enum) non si modulano");
+        for (int k = 0; k < 20; k++) { char m[64]; snprintf(m, sizeof m, "%d %s 0.3", k % 4, g_params[k % 5].key); setp(in, "mod_set", m); }
+        CHECK(h->n_mr <= HM_MAX_ROUTES && h->n_mr == 16, "al massimo 16 percorsi (%d)", h->n_mr);
+        setp(in, "mod_clear", "2");
+        int left2 = 0; for (int r = 0; r < h->n_mr; r++) if (h->mr[r].src == 2) left2++;
+        CHECK(left2 == 0 && h->n_mr > 0, "mod_clear di una sorgente toglie solo i suoi percorsi");
+        setp(in, "mod_clear", "all");
+        CHECK(h->n_mr == 0 && fabsf(h->p[P_GENE] - h->base[P_GENE]) < 1e-6f, "mod_clear all: nessun percorso, tutto al knob");
+
+        /* Random, stepped at 1/4 note at 120 BPM: two new values a second */
+        setp(in, "mod_rand_sync", "1/4"); setf(in, "bpm", 120); blocks(in, 0.1, NULL);
+        float last = h->mod[1]; int changes = 0;
+        for (int k = 0; k < (int)(2.0 * SR / BLK); k++) { blocks(in, (double)BLK / SR, NULL); if (h->mod[1] != last) changes++; last = h->mod[1]; }
+        CHECK(changes >= 3 && changes <= 5, "Random a gradini, 1/4 a 120 BPM: %d valori nuovi in 2 s", changes);
+        setf(in, "mod_rand_smooth", 1.0); changes = 0;
+        for (int k = 0; k < (int)(1.0 * SR / BLK); k++) { blocks(in, (double)BLK / SR, NULL); if (h->mod[1] != last) changes++; last = h->mod[1]; }
+        CHECK(changes > 200, "Random con Smooth: scivola da un valore all'altro (%d blocchi su 344 diversi)", changes);
+
+        /* Follow the input onto Scatter */
+        setp(in, "mod_set", "2 scatter 1"); setf(in, "scatter", 0);
+        g_in_freq = 300; g_in_amp = 0.5; blocks(in, 0.5, NULL);
+        const float up = h->p[P_SCATTER];
+        g_in_amp = 0; blocks(in, 3.5, NULL);
+        CHECK(up > 0.8f && h->p[P_SCATTER] < 0.02f, "Follow: l'ingresso alza Scatter (%.2f), il silenzio lo riporta giu' (%.3f)", up, h->p[P_SCATTER]);
+        setp(in, "mod_clear", "all");
+
+        /* Envelope from the pads */
+        setf(in, "mod_env_attack", 0); setf(in, "mod_env_decay", 0.4);       /* 1 ms, 30 ms */
+        key_on(in, 60); blocks(in, 0.01, NULL);
+        const float pk = h->mod[3];
+        blocks(in, 0.2, NULL);
+        CHECK(pk > 0.5f && h->mod[3] == 0.0f, "Envelope AD da un pad: sale (%.2f) e ricade a zero", pk);
+        key_off(in, 60); setp(in, "mod_env_mode", "Hold");
+        key_on(in, 60); blocks(in, 0.5, NULL);
+        const float held = h->mod[3];
+        key_off(in, 60); blocks(in, 0.3, NULL);
+        CHECK(held > 0.99f && h->mod[3] == 0.0f, "Hold: resta su finche' il pad e' premuto, poi ricade");
+        setp(in, "mod_env_mode", "AD"); setp(in, "mod_env_trigger", "Clock"); setp(in, "clock_source", "Internal"); setp(in, "clock_div", "1/4");
+        int fires = 0; float pe = 0;
+        for (int k = 0; k < (int)(2.0 * SR / BLK); k++) { blocks(in, (double)BLK / SR, NULL); if (h->mod[3] > 0.5f && pe <= 0.5f) fires++; pe = h->mod[3]; }
+        key_on(in, 61); blocks(in, 0.005, NULL);
+        CHECK(fires >= 3 && fires <= 5, "trigger Clock: un inviluppo per tick (%d in 2 s a 1/4, 120 BPM)", fires);
+        key_off(in, 61); setp(in, "clock_source", "Off");
+
+        /* routes are saved with the session and come back */
+        setp(in, "mod_set", "1 gene_size -0.25"); setp(in, "mod_set", "3 rev_mix 0.6");
+        char *js = (char *)malloc(HM_STATE_MAX);
+        api->get_param(in, "state", js, HM_STATE_MAX);
+        void *in2 = new_inst(); hm_t *h2 = H(in2);
+        setp(in2, "state", js);
+        api->get_param(in2, "mod_routes", b, sizeof b);
+        CHECK(h2->n_mr == 2 && strstr(b, "gene_size:1:-0.250") && strstr(b, "rev_mix:3:0.600"), "i percorsi tornano con lo stato salvato: \"%s\"", b);
+        setp(in2, "state", "{\"sample_path\":\"\",\"morph\":0.4}");
+        CHECK(h2->n_mr == 0, "uno stato completo senza percorsi (versioni precedenti) li toglie");
+        setp(in2, "state", "{\"morph\":0.5,\"mod_routes\":\"width:0:0.400,unknown_key:1:0.5\"}");
+        CHECK(h2->n_mr == 1 && h2->mr[0].tgt == P_WIDTH, "chiavi sconosciute nei percorsi: ignorate");
+        free(js);
+        api->destroy_instance(in2);
+        char js2[2048]; api->get_param(in, "ui_state", js2, sizeof js2);
+        CHECK(strstr(js2, "\"mrv\":") && strstr(js2, "\"mo\":["), "ui_state porta la versione dei percorsi e i quattro valori");
+        api->destroy_instance(in);
+    }
+    /* --------------------------------------------------------------- 46 */
+    printf("\n46. Ritagliare: una splice, l'annullamento, il rumore dei tasti\n");
+    {
+        void *in = new_inst(); mkpath(p, sizeof p, "tones.wav"); load_wait(in, p, 10.0); hm_t *h = H(in);
+        setp(in, "splice_source", "Markers"); setp(in, "pad_mode", "Drone");
+        key_on(in, 60); setp(in, "sel_splice", "1"); blocks(in, 0.2, NULL);
+        uint32_t mk0[64]; const int n0 = markers_of(in, mk0);
+        const double fr0 = ui_num(in, "fr");
+        const uint32_t lo = (uint32_t)ui_num(in, "lo"), hi = (uint32_t)ui_num(in, "hi");
+        const uint32_t cut = (uint32_t)(0.25 * SR);
+        char m[64]; snprintf(m, sizeof m, "%u,%u", lo + cut, hi - cut);
+        setp(in, "trim_set", m); blocks(in, 0.6, NULL);
+        int inside = 1, seen = 0;
+        for (int i = 0; i < HM_MAX_GENES; i++) if (h->genes[i].active) { seen++; if (h->genes[i].lo != lo + cut || h->genes[i].len != hi - lo - 2 * cut) inside = 0; }
+        CHECK(ui_num(in, "ton") == 1 && seen > 0 && inside, "anteprima: i geni suonano solo la parte che resta (%d geni)", seen);
+        setp(in, "trim_apply", "1");
+        for (int k = 0; k < 400 && fabs(ui_num(in, "fr") - fr0) < 1; k++) { blocks(in, 0.003, NULL); struct timespec ts = { 0, 2000000 }; nanosleep(&ts, NULL); }
+        uint32_t mk1[64]; const int n1 = markers_of(in, mk1);
+        CHECK(fabs(ui_num(in, "fr") - (fr0 - 2.0 * cut)) < 1 && ui_num(in, "ton") == 0, "applicato: il reel e' piu' corto di 0.5 s (%.0f -> %.0f)", fr0, ui_num(in, "fr"));
+        CHECK(n1 == n0 && mk1[0] == mk0[0] && mk1[1] == mk0[1] - 2 * cut && ui_num(in, "sel") == 1 && fabs(ui_num(in, "hi") - ui_num(in, "lo") - (hi - lo - 2.0 * cut)) < 1,
+              "i marker dopo il taglio arretrano, la splice resta selezionata e dura 0.5 s in meno");
+        const double fade_r = reel_rms(in, lo, lo + 40) / reel_rms(in, lo + 4410, lo + 4450);
+        CHECK(fade_r < 0.25, "una breve dissolvenza dove il suono e' stato tagliato (primo millisecondo a %.2f)", fade_r);
+        setp(in, "pad_mode", "Splice");
+        key_on(in, 36 + 1); double f = freq_of(in, 0.3, 150, 1100); key_off(in, 37);
+        key_on(in, 36 + 2); double f2 = freq_of(in, 0.3, 150, 1100); key_off(in, 38);
+        CHECK(fabs(f - 300) < 6 && fabs(f2 - 450) < 9, "la splice ritagliata e quella dopo suonano come prima (%.0f / %.0f Hz)", f, f2);
+        setp(in, "undo", "1"); blocks(in, 0.05, NULL);
+        uint32_t mk2[64]; const int n2 = markers_of(in, mk2);
+        CHECK(fabs(ui_num(in, "fr") - fr0) < 1 && n2 == n0 && mk2[1] == mk0[1], "Undo: torna il reel di prima, con i suoi marker");
+        /* in Divide mode the divisions become markers */
+        setp(in, "splice_source", "Divide"); setf(in, "divide", 4); setp(in, "sel_splice", "0"); blocks(in, 0.05, NULL);
+        const uint32_t dhi = (uint32_t)ui_num(in, "hi"), dfr = (uint32_t)ui_num(in, "fr");
+        snprintf(m, sizeof m, "%u,%u", 0u, dhi - cut); setp(in, "trim_set", m); setp(in, "trim_apply", "1");
+        for (int k = 0; k < 400 && fabs(ui_num(in, "fr") - dfr) < 1; k++) { blocks(in, 0.003, NULL); struct timespec ts = { 0, 2000000 }; nanosleep(&ts, NULL); }
+        CHECK(h->p[P_SPLICE_SRC] == 0 && h->n_mk == 3 && h->mk[0] == dhi - cut, "da Divide: le divisioni diventano marker, la prima arretra (%u)", h->n_mk ? h->mk[0] : 0);
+        api->destroy_instance(in);
+
+        /* Trim Key Noise on a new splice: the press at the start is skipped, the one at the end taken off */
+        in = new_inst(); wait_blank(in);
+        g_in_freq = 300; g_in_amp = 0.3;
+        setf(in, "sos", 0); setp(in, "rec_source", "Input"); setp(in, "rec_trim", "100 ms");
+        setp(in, "rec_new", "1"); blocks(in, 1.0, NULL); setp(in, "rec_stop", "1"); blocks(in, 0.05, NULL);
+        double fr = ui_num(in, "fr");
+        CHECK(fabs(fr - 0.8 * SR) <= BLK + 2, "1 s premuto: restano 0.8 s (%.0f frame), 100 ms in meno all'inizio e alla fine", fr);
+        api->destroy_instance(in);
+        /* ... and on an overdub: what the last frames replaced comes back */
+        in = new_inst(); mkpath(p, sizeof p, "tones.wav"); load_wait(in, p, 10.0); h = H(in);
+        setp(in, "splice_source", "Markers"); setp(in, "pad_mode", "Drone"); setf(in, "organize", 0.0);
+        setf(in, "sos", 0); setp(in, "rec_source", "Input"); setp(in, "rec_trim", "200 ms");
+        key_on(in, 60); blocks(in, 0.2, NULL);
+        g_in_amp = 0;
+        const uint32_t s0 = (uint32_t)ui_num(in, "lo");
+        setp(in, "rec_cur", "1"); blocks(in, 0.5, NULL); setp(in, "rec_stop", "1"); blocks(in, 0.05, NULL);
+        const double r_a = reel_rms(in, s0 + (uint32_t)(0.02 * SR), s0 + (uint32_t)(0.17 * SR));
+        const double r_b = reel_rms(in, s0 + (uint32_t)(0.21 * SR), s0 + (uint32_t)(0.28 * SR));
+        const double r_c = reel_rms(in, s0 + (uint32_t)(0.33 * SR), s0 + (uint32_t)(0.48 * SR));
+        CHECK(r_a > 0.05 && r_b < 1e-6 && r_c > 0.05, "sovraincisione: inizio non scritto (%.3f), meta' scritta (%.4f), ultimi 200 ms rimessi com'erano (%.3f)", r_a, r_b, r_c);
+        /* with Record Sync nothing is cut: the press is not at the edges */
+        api->destroy_instance(in);
+        in = new_inst(); wait_blank(in);
+        g_in_freq = 330; g_in_amp = 0.2;
+        setp(in, "clock_source", "Internal"); setf(in, "bpm", 120); setp(in, "clock_div", "1/2");
+        setp(in, "rec_sync", "On"); setf(in, "sos", 0); setp(in, "rec_source", "Input"); setp(in, "rec_trim", "300 ms");
+        blocks(in, 0.7, NULL); setp(in, "rec_cur", "1"); blocks(in, 1.1, NULL); setp(in, "rec_stop", "1"); blocks(in, 1.5, NULL);
+        fr = ui_num(in, "fr");
+        CHECK(ui_num(in, "rec") == 0 && fabs(fr - SR) < 400, "con Record Sync la durata resta esattamente un tick (%.0f frame)", fr);
+        g_in_amp = 0; api->destroy_instance(in);
     }
     snprintf(cmd, sizeof cmd, "rm -rf %s", g_dir); if (system(cmd)) { }
     printf("\n%s (%d controlli falliti)\n", g_fail ? "ESITO: FALLITO" : "ESITO: TUTTO OK", g_fail);

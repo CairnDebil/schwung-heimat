@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Build both Heimat modules for Ableton Move (ARM64):
-#   dist/heimat/        chain sound generator      -> dist/heimat-module.tar.gz
-#   dist/heimat-solo/   standalone overtake module -> dist/heimat-solo-module.tar.gz
-# Both come from src/dsp/heimat.c (HM_SOLO=0 / HM_SOLO=1).
+# Build Heimat for Ableton Move (ARM64):
+#   dist/heimat-solo/  the overtake instrument -> dist/heimat-solo-module.tar.gz
+# (The module keeps the id heimat-solo, which it has had since the start, so an
+# installed copy updates in place. The track-slot module is suspended: see
+# attic/track-module.)
 #
 # Uses Docker for cross-compilation unless CROSS_PREFIX is set
 # (e.g. CROSS_PREFIX=aarch64-linux-gnu- for a local toolchain).
@@ -34,33 +35,25 @@ echo "=== Building Heimat (cross prefix: $CROSS_PREFIX) ==="
 if command -v python3 >/dev/null 2>&1; then python3 scripts/gen_web.py; fi   # editor and manual follow the parameter table
 
 rm -rf build dist
-mkdir -p build dist/heimat dist/heimat-solo
+mkdir -p build dist/heimat-solo
 FLAGS="-O3 -g -shared -fPIC -std=gnu11 -pthread -Wall -Wextra -Isrc/dsp"
 
-${CROSS_PREFIX}gcc $FLAGS -DHM_SOLO=0 src/dsp/heimat.c -o build/heimat.so -lm
-${CROSS_PREFIX}gcc $FLAGS -DHM_SOLO=1 src/dsp/heimat.c -o build/heimat-solo.so -lm
+${CROSS_PREFIX}gcc $FLAGS src/dsp/heimat.c -o build/heimat-solo.so -lm
 
 # cat instead of cp: avoids ExtFS deallocation issues with Docker volumes
-cat src/module.json      > dist/heimat/module.json
-cat src/help.json        > dist/heimat/help.json
-cat src/ui.js            > dist/heimat/ui.js
-cat build/heimat.so      > dist/heimat/dsp.so
-cat src/solo/module.json > dist/heimat-solo/module.json
-cat src/solo/help.json   > dist/heimat-solo/help.json
-cat src/solo/ui.js       > dist/heimat-solo/ui.js
-cat build/heimat-solo.so > dist/heimat-solo/dsp.so
-for d in heimat heimat-solo; do
-    cat src/web/web_ui.html > dist/$d/web_ui.html    # browser editor, served by schwung-manager
-    cat LICENSE > dist/$d/LICENSE
-    cat NOTICE  > dist/$d/NOTICE
-    chmod +x dist/$d/dsp.so
-done
+D=dist/heimat-solo
+cat src/module.json        > $D/module.json
+cat src/help.json          > $D/help.json
+cat src/ui.js              > $D/ui.js
+cat build/heimat-solo.so   > $D/dsp.so
+cat src/web/web_ui.html    > $D/web_ui.html    # browser editor, served by schwung-manager
+cat LICENSE                > $D/LICENSE
+cat NOTICE                 > $D/NOTICE
+chmod +x $D/dsp.so
 
-( cd dist && tar --owner=0 --group=0 -czf heimat-module.tar.gz heimat/ \
-          && tar --owner=0 --group=0 -czf heimat-solo-module.tar.gz heimat-solo/ )
+( cd dist && tar --owner=0 --group=0 -czf heimat-solo-module.tar.gz heimat-solo/ )
 
 echo ""
 echo "=== Build complete ==="
-echo "dist/heimat-module.tar.gz       (Signal Chain sound generator)"
-echo "dist/heimat-solo-module.tar.gz  (standalone instrument)"
+echo "dist/heimat-solo-module.tar.gz  (Heimat)"
 echo "Install: ./scripts/install.sh"

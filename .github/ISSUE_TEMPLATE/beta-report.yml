@@ -12,8 +12,8 @@ body:
     id: heimat
     attributes:
       label: Heimat version
-      description: Heimat Solo → Menu → About / DSP load
-      placeholder: 0.7.0
+      description: Heimat → Menu → About / DSP load
+      placeholder: 0.12.0
     validations:
       required: true
   - type: input
@@ -24,14 +24,13 @@ body:
     validations:
       required: true
   - type: dropdown
-    id: module
+    id: where
     attributes:
-      label: Module
+      label: Where
       options:
-        - Heimat Solo
-        - Heimat in a track slot
-        - Both
+        - On the Move
         - Browser editor
+        - Both
     validations:
       required: true
   - type: dropdown
@@ -44,7 +43,7 @@ body:
         - 3. Genes and Micro
         - 4. Effects and HEADS
         - 5. Load
-        - 6. Track slot
+        - 6. Updating from Heimat Solo
         - 7. Browser editor
         - 8. Long run and leaving
         - Something else

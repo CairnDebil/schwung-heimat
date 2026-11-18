@@ -5,7 +5,6 @@
 //   solo   as in schwung-manager's Tool tab, fed with the "state" that the real
 //          DSP produced in tests/render_test.c (test 38), exploded into
 //          overtake_dsp:<key> strings exactly as the manager does
-//   chain  as a track-slot panel, keys prefixed with synth:
 // Screenshots go to docs/screens/ when SCREENS=1.
 //
 //   node tests/web_test.mjs
@@ -136,25 +135,32 @@ console.log('\n2. Demo (nessun Move collegato)');
   await page.mouse.click(reel.x + 6 + (reel.w - 12) * (4.4 / 11), reel.y + reel.h * 0.8);
   await page.waitForTimeout(100);
   check((await txt(page, '#roSplice')) === '4 of 8', `clic sul reel seleziona lo splice (${await txt(page, '#roSplice')})`);
-  await page.click('[aria-label="Sync"] >> text=1/4');
+  /* the reverb: its own panel; the top of Decay reads as forever, Depth by what it does */
+  await page.evaluate(() => { const H = window.heimatEditor; H.send('rev_decay', 1); H.send('rev_depth', -0.5); H.send('rev_size', 0.85); });
+  await page.waitForTimeout(150);
+  check((await page.$eval('[aria-label="Decay"]', (e) => e.getAttribute('aria-valuetext'))) === 'Forever', 'Decay in cima: "Forever"');
+  check((await page.$eval('[aria-label="Depth"]', (e) => e.getAttribute('aria-valuetext'))) === 'Chorus 50%' &&
+        (await page.$eval('[aria-label="Size"]', (e) => e.getAttribute('aria-valuetext'))) === 'Cave', 'Depth e Size si leggono a parole (Chorus 50%, Cave)');
+  await page.click('[aria-label="Reverse: the pre-delay backwards"] >> text=On');
   await page.waitForTimeout(100);
-  check((await page.$eval('[aria-label="Time"]', (e) => e.getAttribute('aria-valuetext'))) === '1/4', 'con Sync il tempo del delay mostra la nota');
+  check((await page.evaluate(() => window.heimatEditor.P.rev_reverse)) === 1, 'Reverse si accende dal pannello del riverbero');
+  check(await inkPixels(page, '#rev') > 0.01 && (await page.$$('#dly')).length === 0, 'il riverbero e\' disegnato; il vecchio delay non c\'e\' piu\'');
   check(errors.length === 0, 'nessun errore JavaScript' + (errors.length ? ': ' + errors.join(' | ') : ''));
-  await page.evaluate(() => { const H = window.heimatEditor; Object.assign(H.P, { morph: 0.62, gene_size: 0.3, gene_window: 1, scatter: 0.3, dly_mix: 0.35, dly_fdbk: 0.55, rev_mix: 0.3, rev_decay: 0.62, eq_low: 3, eq_mid: -5, eq_freq: 1800, eq_high: 2, dly_sync: 0 }); H.send('morph', 0.62); });
+  await page.evaluate(() => { const H = window.heimatEditor; Object.assign(H.P, { morph: 0.62, gene_size: 0.3, gene_window: 1, scatter: 0.3, rev_mix: 0.3, rev_decay: 0.62, rev_size: 0.7, rev_depth: 0.4, hd_mix: 0.3, eq_low: 3, eq_mid: -5, eq_freq: 1800, eq_high: 2 }); H.send('morph', 0.62); });
   await page.waitForTimeout(600);
   await snap(page, 'editor_demo');
   await ctx.close();
 }
 
 /* ------------------------------------------------------------------ 3 */
-console.log('\n3. Heimat Solo nella scheda Tool (stato reale dal DSP)');
+console.log('\n3. Heimat nella scheda Tool (stato reale dal DSP)');
 {
   const state = JSON.parse(fs.readFileSync(STATE, 'utf8'));
   const { ctx, page, errors } = await open(browser, { component: 'tool' });
-  check((await txt(page, '#whereTxt')).startsWith('Waiting'), 'prima dei dati: in attesa di Heimat Solo');
+  check((await txt(page, '#whereTxt')).startsWith('Waiting'), 'prima dei dati: in attesa di Heimat');
   await page.evaluate((p) => window.__cb(p), explode(state, 'overtake_dsp:'));
   await page.waitForTimeout(150);
-  check((await txt(page, '#whereTxt')) === 'Heimat Solo, live', 'arrivato lo stato: Heimat Solo, live');
+  check((await txt(page, '#whereTxt')) === 'Heimat, live', 'arrivato lo stato: Heimat, live');
   check((await txt(page, '#roSplice')) === '1 of 4', `quattro splice dai marker del file (${await txt(page, '#roSplice')})`);
   check((await txt(page, '#roLen')) === '2.00 s', `lunghezza dello splice (${await txt(page, '#roLen')})`);
   const gene = await txt(page, '#roGene');
@@ -198,9 +204,9 @@ console.log('\n3. Heimat Solo nella scheda Tool (stato reale dal DSP)');
   await page.waitForTimeout(500);
   await page.evaluate(() => window.__cb({ 'overtake_dsp:rev_mix': '0.7', 'overtake_dsp:v_rec': '2', 'overtake_dsp:v_rpos': '200000', 'overtake_dsp:rev': '99' }));
   await page.waitForTimeout(120);
-  check((await page.$eval('[aria-label="Mix"] >> nth=-1', (e) => e.getAttribute('aria-valuetext'))) === '70%', 'un knob girato sul Move si muove anche nel browser');
+  check((await page.$eval('[aria-label="Reverb mix"]', (e) => e.getAttribute('aria-valuetext'))) === '70%', 'un knob girato sul Move si muove anche nel browser');
   check(await page.$eval('#bRec', (e) => e.getAttribute('aria-pressed')) === 'true', 'registrazione in corso: Record acceso');
-  check(await page.$eval('.panel.solo-only', (e) => !e.hidden), 'il pannello Recording e\' visibile');
+  check(await page.$eval('[aria-labelledby="hRec"]', (e) => !e.hidden), 'il pannello Recording e\' visibile');
   check(errors.length === 0, 'nessun errore JavaScript' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await page.evaluate(() => window.__cb({ 'overtake_dsp:v_rec': '0', 'overtake_dsp:v_save': '2', 'overtake_dsp:hd_mix': '0.4',
     'overtake_dsp:hd_heads': '3', 'overtake_dsp:hd_spacing': '0.55', 'overtake_dsp:hd_reverse': '0.35', 'overtake_dsp:hd_fdbk': '0.6',
@@ -234,27 +240,57 @@ console.log('\n3b. Pannello Heads');
   await ctx.close();
 }
 
-/* ------------------------------------------------------------------ 4 */
-console.log('\n4. Heimat in uno slot della catena');
+/* ------------------------------------------------------------------ 3c */
+console.log('\n3c. Modulatori');
 {
-  const { ctx, page, errors } = await open(browser, { component: 'synth' });
-  await page.evaluate(() => window.__cb({ 'synth:morph': '0.7', 'synth:gene_size': '0.4', 'synth:gene_window': '2', 'fx1:mix': '0.3', 'slot:volume': '1' }));
-  await page.waitForTimeout(150);
-  check((await txt(page, '#whereTxt')) === 'Track slot, live', 'si presenta come slot della catena');
-  check((await page.evaluate(() => window.heimatEditor.P.morph)) === 0.7, 'legge i propri parametri (synth:) e ignora gli altri componenti');
-  check(await page.$eval('#transport', (e) => e.hidden) && await page.$eval('.panel.solo-only', (e) => e.hidden), 'niente trasporto ne\' registrazione (sono di Heimat Solo)');
-  check(await page.$eval('#reelBox', (e) => e.hidden) && /Heimat Solo/.test(await txt(page, '#chainNote')), 'al posto del reel una riga spiega dove trovarlo');
-  check((await page.$eval('[aria-label="Gene-Size"]', (e) => e.getAttribute('aria-valuetext'))) === '40%', 'Gene-Size in percentuale (la lunghezza dello splice non e\' nota)');
-  await page.focus('[aria-label="Scatter"]'); await page.keyboard.press('ArrowUp');
-  check((await calls(page)).some(([k]) => k === 'synth:scatter'), 'scrive con il prefisso synth:');
+  const { ctx, page, errors } = await open(browser, { component: 'tool' });
+  await page.evaluate(() => window.__cb({ 'overtake_dsp:mod_routes': 'gene_size:0:0.250,rev_mix:3:-0.500', 'overtake_dsp:v_mo': '0.8,-0.3,0.5,1', 'overtake_dsp:v_fr': '0' }));
+  await page.waitForTimeout(300);
+  const rt = await txt(page, '#routes');
+  check(/Wave \u2192 Gene-Size/.test(rt) && /\+25%/.test(rt) && /Envelope \u2192 Reverb Mix/.test(rt) && /-50%/.test(rt), 'i percorsi arrivano dal DSP e si leggono');
+  check(await inkPixels(page, '#mod0') > 0.005 && await inkPixels(page, '#mod3') > 0.005, 'i quattro modulatori si vedono muoversi');
+  await page.$eval('[aria-label="Depth of Wave \u2192 Gene-Size"]', (e) => { e.value = '60'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.click('[aria-label="Remove Envelope \u2192 Reverb Mix"]');
+  await page.selectOption('#rSrc', '2'); await page.selectOption('#rTgt', 'scatter'); await page.click('#rAdd');
+  await page.click('[aria-label="Wave sync"] >> text=1/4');
+  const c = await calls(page);
+  check(c.some(([k, v]) => k === 'overtake_dsp:mod_set' && v === '0 gene_size 0.600'), 'il cursore cambia la profondita\' (mod_set 0 gene_size 0.600)');
+  check(c.some(([k, v]) => k === 'overtake_dsp:mod_set' && v === '3 rev_mix 0.000'), 'la croce toglie il percorso');
+  check(c.some(([k, v]) => k === 'overtake_dsp:mod_set' && v === '2 scatter 0.250'), 'Add route: Follow su Scatter al 25%');
+  check(c.some(([k, v]) => k === 'overtake_dsp:mod_wave_sync' && v === '5'), 'Wave sync a 1/4');
+  check(/Follow \u2192 Scatter/.test(await txt(page, '#routes')) && !/Envelope/.test(await txt(page, '#routes')), 'la lista segue le modifiche');
   check(errors.length === 0, 'nessun errore JavaScript' + (errors.length ? ': ' + errors.join(' | ') : ''));
-  await snap(page, 'editor_chain');
   await ctx.close();
 }
+
+/* ------------------------------------------------------------------ 3d */
+console.log('\n3d. Ritagliare dal browser');
 {
-  const { ctx, page } = await open(browser, { component: 'fx2' });
-  await page.evaluate(() => window.__cb({ 'fx2:morph': '0.33', 'synth:morph': '0.9' }));
-  check((await page.evaluate(() => window.heimatEditor.P.morph)) === 0.33, 'segue il componente indicato dal manager (fx2:)');
+  const state = JSON.parse(fs.readFileSync(STATE, 'utf8'));
+  const { ctx, page, errors } = await open(browser, { component: 'tool' });
+  await page.evaluate((p) => window.__cb(p), explode(state, 'overtake_dsp:'));
+  await page.waitForTimeout(200);
+  check(await page.$eval('#tApply', (e) => e.disabled), 'Cut spento finche\' non si sposta niente');
+  await page.$eval('#tIn', (e) => { e.value = '100'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.waitForTimeout(80);
+  await page.$eval('#tOut', (e) => { e.value = '800'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.waitForTimeout(120);
+  let c = await calls(page);
+  const last = c.filter(([k]) => k === 'overtake_dsp:trim_set').pop();
+  const [ta, tb] = last ? last[1].split(',').map(Number) : [0, 0];
+  check(Math.abs(ta - 8820) < 2 && Math.abs(tb - 70560) < 2, `trim_set dalla splice selezionata (${last ? last[1] : 'nessuno'})`);
+  check(/\+0\.20 s/.test(await txt(page, '#oIn')) && /0\.40 s/.test(await txt(page, '#oOut')), 'quanto si toglie, in secondi');
+  await page.click('#tApply');
+  c = await calls(page);
+  check(c.some(([k]) => k === 'overtake_dsp:trim_apply') && await page.$eval('#tApply', (e) => e.disabled), 'Cut manda trim_apply e torna a riposo');
+  await page.$eval('#tIn', (e) => { e.value = '300'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.click('#tCancel');
+  c = await calls(page);
+  check(c.some(([k]) => k === 'overtake_dsp:trim_cancel') && (await page.$eval('#tIn', (e) => e.value)) === '0', 'Keep all annulla');
+  await page.click('[aria-label="Trim key noise (start and end of a recording)"] >> text=100 ms');
+  c = await calls(page);
+  check(c.some(([k, v]) => k === 'overtake_dsp:rec_trim' && v === '2'), 'Trim key noise a 100 ms');
+  check(errors.length === 0, 'nessun errore JavaScript' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await ctx.close();
 }
 
@@ -290,8 +326,8 @@ console.log('\n6. Il manuale (docs/index.html)');
       const rows = await page.$$eval('table.ref tbody tr:not(.grp)', (r) => r.length);
       const nParams = [...fs.readFileSync(path.join(root, 'src/dsp/heimat.c'), 'utf8').matchAll(/\[P_\w+\]\s*=\s*P[FIE]\("/g)].length;
       check(rows === nParams, `tabella dei parametri generata dal sorgente: ${rows} righe per ${nParams} parametri`);
-      await page.click('#tabs >> text=FX 2');
-      check((await page.$eval('#pgImg', (e) => e.getAttribute('src'))) === 'screens/fx_2.png' && /RFX/.test(await txt(page, '#pgCells')), 'le schede delle pagine cambiano schermata e celle');
+      await page.click('#tabs >> text=REVERB 2');
+      check((await page.$eval('#pgImg', (e) => e.getAttribute('src'))) === 'screens/reverb_2.png' && /RVRS/.test(await txt(page, '#pgCells')), 'le schede delle pagine cambiano schermata e celle');
       const missing = await page.$$eval('img', (im) => im.filter((i) => i.complete && i.naturalWidth === 0).map((i) => i.getAttribute('src')));
       check(missing.length === 0, 'tutte le immagini esistono' + (missing.length ? ': ' + missing.join(', ') : ''));
       await page.click('button[aria-label="Pad 5"]');
