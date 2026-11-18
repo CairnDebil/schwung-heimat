@@ -355,6 +355,11 @@ function vline(x, y0, y1, v = 1) { const a = Math.max(0, Math.min(y0, y1)), b = 
 function dotted(x, y0, y1) { for (let y = y0; y <= y1; y += 2) px(x, y); }
 function txt(x, y, s, v = 1) { print(x, y, s, v); }
 function tw(s) { return typeof text_width === 'function' ? text_width(s) : s.length * 6; }
+/* the first of several wordings that fits between x and the right edge */
+function fitTxt(x, y, list) {
+    for (const s of list) if (x + tw(s) - 1 <= W - 1) { txt(x, y, s); return; }
+    txt(x, y, list[list.length - 1]);
+}
 function inverse(x, y, w, h, s, pad = 2) { fill_rect(x, y, w, h, 1); txt(x + pad, y + 1, s, 0); }
 function circle(cx, cy, r, filled) {
     for (let a = 0; a < 24; a++) {
@@ -792,7 +797,7 @@ function drawEq() {
     vline(64, 12, 38, 1);
     txt(68, 12, 'HEADS ' + Math.round(P.hd_mix * 100) + '%');
     txt(68, 21, 'REVERB ' + Math.round(P.rev_mix * 100) + '%');
-    txt(68, 30, P.fx_rec ? 'REC WITH FX' : 'REC DRY');
+    txt(68, 30, P.fx_rec ? 'REC + FX' : 'REC DRY');
     drawCells();
 }
 /* the space from above: a box as big as Size, the pre-delay as a gap before
@@ -815,9 +820,9 @@ function drawReverb() {
     }
     if (P.rev_reverse) { txt(xs + 1, base - sz + 1 > 13 ? base - sz - 8 : 13, '<<'); }
     vline(64, 12, 38, 1);
-    txt(68, 12, revSpace() + ' ' + fmtParam('rev_decay'));
-    txt(68, 21, revDepthName());
-    txt(68, 30, fmtParam('rev_tilt'));
+    fitTxt(68, 12, [revSpace() + ' ' + fmtParam('rev_decay'), revSpace().slice(0, 3) + ' ' + fmtParam('rev_decay'), fmtParam('rev_decay')]);
+    fitTxt(68, 21, [revDepthName(), revDepthName().replace(' ', '')]);
+    fitTxt(68, 30, [fmtParam('rev_tilt'), fmtParam('rev_tilt').replace(' ', '')]);
     drawCells();
 }
 function drawReverb2() {
@@ -834,9 +839,9 @@ function drawReverb2() {
         txt(1, 21, 'FORWARDS');
     }
     vline(64, 12, 38, 1);
-    txt(68, 12, 'ABSORB ' + Math.round(P.rev_damp * 100) + '%');
-    txt(68, 21, 'SPD ' + fmtParam('rev_speed'));
-    txt(68, 30, P.fx_rec ? 'REC WITH FX' : 'REC DRY');
+    fitTxt(68, 12, ['ABSORB ' + Math.round(P.rev_damp * 100) + '%', 'ABS ' + Math.round(P.rev_damp * 100) + '%']);
+    fitTxt(68, 21, ['SPD ' + fmtParam('rev_speed'), fmtParam('rev_speed')]);
+    txt(68, 30, P.fx_rec ? 'REC + FX' : 'REC DRY');
     drawCells();
 }
 
@@ -904,7 +909,7 @@ function drawSetup() {
 }
 
 const MENU = ['Load WAV...', 'New empty reel', 'Save reel', 'Auto-splice', 'Clear all markers', 'Undo', 'Clear heads', 'Trim splice...', 'About / DSP load'];
-const VERSION = '0.12.0';
+const VERSION = '0.12.1';
 
 /* version and the load meter, for beta reports: Heimat's own share of each
  * block's real time (average, recent peak) and the blocks that ran over */

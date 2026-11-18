@@ -1,4 +1,4 @@
-# Heimat 0.12.0 — scheda di collaudo della beta
+# Heimat 0.12.1 — scheda di collaudo della beta
 
 Grazie per il collaudo. Heimat ha superato tutti i test offline, ma non ha
 ancora passato ore su una Move vera: questa scheda serve a questo. Ogni sezione
@@ -15,7 +15,7 @@ gli altoparlanti interni il microfono sente gli altoparlanti.
 - [ ] Installa `heimat-solo-module.tar.gz` (Schwung Manager → *Modules* →
       modulo personalizzato, oppure `scripts/install.sh`) e riavvia la Move.
 - [ ] Apri Heimat → **Menu** → **About / DSP load**: deve dire
-      `HEIMAT 0.12.0 BETA`. Tieni a mente questa schermata: serve per le misure
+      `HEIMAT 0.12.1 BETA`. Tieni a mente questa schermata: serve per le misure
       di carico.
 
 **Come leggere About / DSP load.** `DSP` è la parte media di ogni blocco audio
@@ -142,7 +142,7 @@ minuto di ogni passo. Annota `DSP`, `PEAK` e `OVER`.
 
 ## 6. Aggiornare da Heimat Solo
 
-- [ ] Installa la 0.12.0 sopra Heimat Solo: nel menu dei moduli di Schwung ora
+- [ ] Installa la 0.12.1 sopra Heimat Solo: nel menu dei moduli di Schwung ora
       c'è **Heimat**, una volta sola, e Heimat Solo non c'è più.
 - [ ] Aprilo: ritrovi le impostazioni e l'ultima bobina di prima
       dell'aggiornamento; le bobine salvate sono ancora in `Samples/Heimat`.

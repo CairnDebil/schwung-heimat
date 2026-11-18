@@ -1,4 +1,4 @@
-# Heimat 0.12.0 — beta test sheet
+# Heimat 0.12.1 — beta test sheet
 
 Thank you for testing. Heimat has passed its offline tests, but it has not
 yet spent hours on real Moves. That is what this sheet is for. Each section
@@ -15,7 +15,7 @@ speakers the microphone hears the speakers.
 - [ ] Install `heimat-solo-module.tar.gz` (Schwung Manager → *Modules* →
       custom module, or `scripts/install.sh`) and restart the Move.
 - [ ] Open Heimat → **Menu** → **About / DSP load**: it reads
-      `HEIMAT 0.12.0 BETA`. Keep this screen in mind: you will use it for the
+      `HEIMAT 0.12.1 BETA`. Keep this screen in mind: you will use it for the
       load figures.
 
 **How to read About / DSP load.** `DSP` is the average share of each audio
@@ -134,7 +134,7 @@ minute of each step. Write down `DSP`, `PEAK` and `OVER`.
 
 ## 6. Updating from Heimat Solo
 
-- [ ] Install 0.12.0 over an installed Heimat Solo: Schwung's module menu now
+- [ ] Install 0.12.1 over an installed Heimat Solo: Schwung's module menu now
       shows **Heimat**, once, and no Heimat Solo.
 - [ ] Open it: the settings and the last reel from before the update are
       there; saved reels are still in `Samples/Heimat`.

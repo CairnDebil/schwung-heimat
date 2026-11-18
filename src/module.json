@@ -2,7 +2,7 @@
   "id": "heimat-solo",
   "name": "Heimat",
   "abbrev": "HMT",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "min_host_version": "1.7.3",
   "description": "Tape and microsound instrument: record, splice by hand, granulate with envelopes, scatter and spread, tape heads and reverb, clock sync and reel saving",
   "author": "CairnDebil",

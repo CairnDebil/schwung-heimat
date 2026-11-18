@@ -35,7 +35,8 @@ Date.now = () => clock;
 let frameOps = [];
 const shots = {};
 globalThis.clear_screen = () => { frameOps = []; };
-globalThis.print = (x, y, s, c = 1) => frameOps.push(['t', x, y, String(s), c]);
+const overflow = new Set();                    /* text that would run off the screen (6 px a character, the last column may touch the edge) */
+globalThis.print = (x, y, s, c = 1) => { s = String(s); if (x < 0 || x + s.length * 6 - 1 > 128) overflow.add(s + ' @' + x + ',' + y); frameOps.push(['t', x, y, s, c]); };
 globalThis.set_pixel = (x, y, v = 1) => frameOps.push(['p', x, y, v]);
 globalThis.fill_rect = (x, y, w, h, v = 1) => frameOps.push(['f', x, y, w, h, v]);
 globalThis.draw_rect = (x, y, w, h, v = 1) => frameOps.push(['r', x, y, w, h, v]);
@@ -568,5 +569,6 @@ check(!hasText('PEAK'), 'un clic sul jog chiude la schermata');
 fs.mkdirSync(path.join(here, 'screens'), { recursive: true });
 fs.writeFileSync(path.join(here, 'screens', 'ops.json'), JSON.stringify(shots));
 fs.rmSync(tmp, { recursive: true, force: true });
+check(overflow.size === 0, 'nessun testo esce dallo schermo' + (overflow.size ? ': ' + [...overflow].slice(0, 12).join(' | ') : ''));
 console.log(`\n${fails ? 'ESITO: FALLITO' : 'ESITO: TUTTO OK'} (${passes} controlli superati, ${fails} falliti)`);
 process.exit(fails ? 1 : 0);

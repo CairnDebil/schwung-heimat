@@ -313,7 +313,8 @@ as a demo on a made-up reel.
 
 ## Beta
 
-Version 0.12.0 adds trimming: a splice can be cut to the part you want, and
+Version 0.12.1 tidies the editor (trim controls under the reel, a cleaner
+Reverb panel). 0.12.0 added trimming: a splice can be cut to the part you want, and
 the noise of the buttons at the start and end of a recording can be left out.
 0.11.0 added four modulators (Wave, Random, Follow, Envelope), routed
 by holding a Track button and turning a knob. 0.10.0 added Pattern (repeatable chance for the genes) and the looper

@@ -5,6 +5,22 @@ version (1.1, 1.2) adds features without breaking saved sessions or patches,
 and a patch version (1.0.1) only fixes things. Before 1.0 every version is a
 development or beta release.
 
+## [0.12.1] — editor layout
+
+### Changed
+- Editor: the trim controls sit right under the reel, on one line (*Trim
+  splice N*, From, To, Cut, Keep all), and two handles under the selected
+  splice can be dragged on the waveform itself.
+- Editor, Reverb panel: the scope across the whole panel, the eight knobs on
+  one line in two groups (Mix, Size, Predelay, Decay | Absorb, Depth, Speed,
+  Tilt) and the two switches below. Knob names stay on one line everywhere, so
+  the dials of a row line up.
+
+### Fixed
+- REVERB pages on the Move: "STUDIO 1.8s" and "REC WITH FX" ran past the edge
+  of the screen; long readings now shorten to fit. The UI tests check that no
+  text leaves the screen.
+
 ## [0.12.0] — trimming
 
 ### Added
@@ -204,6 +220,7 @@ granulation), EQ, delay and reverb, clock from the internal BPM, the Move or
 MIDI, and Heimat Solo with recording, Sound on Sound, marker editing and saving
 reels. 0.5.0 fixed the spacing of overlapping genes.
 
+[0.12.1]: https://github.com/CairnDebil/schwung-heimat/releases/tag/v0.12.1
 [0.12.0]: https://github.com/CairnDebil/schwung-heimat/releases/tag/v0.12.0
 [0.11.0]: https://github.com/CairnDebil/schwung-heimat/releases/tag/v0.11.0
 [0.10.0]: https://github.com/CairnDebil/schwung-heimat/releases/tag/v0.10.0

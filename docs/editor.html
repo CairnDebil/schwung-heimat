@@ -137,12 +137,18 @@ button { font: inherit; color: inherit; }
 .row + .row { margin-top: 8px; }
 .row.gap { margin-top: 14px; }
 .row.knobs { gap: 8px 2px; }
-.revcols { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
-.revcols > div { min-width: 0; padding: 0 16px; }
-.revcols > div:first-child { padding-left: 0; }
-.revcols > div:last-child { padding-right: 0; }
-.revcols > div + div { border-left: 1px solid var(--hair); }
-.revcols .knob, #gEq .knob { width: 70px; }
+.revcols { display: grid; grid-template-columns: auto auto; justify-content: start; gap: 0; margin-top: 14px; }
+.revcols > .row { flex-wrap: nowrap; padding: 0 16px; }
+.revcols > .row:first-child { padding-left: 0; }
+.revcols > .row + .row { border-left: 1px solid var(--hair); margin-top: 0; }
+.revsw { margin-top: 14px; gap: 10px 28px; }
+section[aria-labelledby="hRev"] { container-type: inline-size; }
+@container (max-width: 700px) {
+  .revcols { grid-template-columns: minmax(0, 1fr); }
+  .revcols > .row { padding: 0; flex-wrap: wrap; }
+  .revcols > .row + .row { border-left: 0; border-top: 1px solid var(--hair); padding-top: 14px; margin-top: 14px; }
+}
+.revcols .knob, #gEq .knob { width: 72px; }
 .headscols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 0; }
 .modcols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
 .modcols > div { min-width: 0; padding: 0 14px; border-left: 1px solid var(--hair); }
@@ -150,12 +156,17 @@ button { font: inherit; color: inherit; }
 .modcols h3 { margin: 0 0 6px; font: 700 11px/1 var(--label); letter-spacing: .14em; text-transform: uppercase; color: var(--silk); }
 .modcols canvas { display: block; width: 100%; height: 34px; margin-bottom: 8px; background: var(--window); }
 .routes { margin-top: 16px; display: grid; gap: 6px; }
-.trim { margin-top: 18px; }
-.trim .lbl { font: 600 11px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--silk-2); margin-bottom: 8px; }
-.trows { display: grid; gap: 6px; }
-.trows label { display: grid; grid-template-columns: 40px minmax(0, 1fr) 70px; gap: 10px; align-items: center; font: 600 11px/1 var(--label); letter-spacing: .1em; text-transform: uppercase; color: var(--silk-2); }
-.trows input { width: 100%; accent-color: var(--mag); }
-.trows output { font: 500 13px/1 var(--type); color: var(--silk); text-align: right; }
+.trim { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 8px 16px; align-items: center; margin-top: 8px; }
+.trim .lbl { font: 700 11px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--mag); white-space: nowrap; }
+.trim label { display: grid; grid-template-columns: auto minmax(60px, 1fr) 62px; gap: 8px; align-items: center; font: 600 11px/1 var(--label); letter-spacing: .1em; text-transform: uppercase; color: var(--silk-2); }
+.trim input { width: 100%; accent-color: var(--mag); }
+.trim output { font: 500 13px/1 var(--type); color: var(--silk); text-align: right; white-space: nowrap; text-transform: none; letter-spacing: 0; }
+.trim .abtn { padding-left: 12px; padding-right: 12px; }
+@media (max-width: 760px) {
+  .trim { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .trim .lbl { grid-column: 1 / -1; }
+  .trim label { grid-column: 1 / -1; }
+}
 .abtn:disabled { opacity: .35; cursor: default; }
 .route { display: grid; grid-template-columns: minmax(0, 1fr) minmax(90px, 1.2fr) 52px auto; gap: 10px; align-items: center; font: 500 13px/1.2 var(--type); color: var(--silk); }
 .route input[type=range] { width: 100%; accent-color: var(--acid); }
@@ -179,7 +190,7 @@ button { font: inherit; color: inherit; }
 .knob .val { fill: none; stroke: var(--acid); stroke-width: 3; stroke-linecap: round; filter: drop-shadow(0 0 3px rgba(212, 255, 58, .45)); }
 .knob .cap { fill: #050505; stroke: var(--silk); stroke-width: 1.5; }
 .knob .ptr { stroke: var(--silk); stroke-width: 2.6; stroke-linecap: round; }
-.knob .lbl { font: 700 10.5px/1.2 var(--label); letter-spacing: .16em; text-transform: uppercase; color: var(--silk-2); text-align: center; }
+.knob .lbl { font: 700 10.5px/1.2 var(--label); letter-spacing: .16em; text-transform: uppercase; color: var(--silk-2); text-align: center; white-space: nowrap; }
 .knob .num { font: 600 14px/1.15 var(--label); text-align: center; white-space: nowrap; color: var(--acid); font-variant-numeric: tabular-nums; }
 .knob.disabled .val { stroke: var(--silk-3); filter: none; }
 .knob.disabled .num { color: var(--silk-3); }
@@ -251,8 +262,8 @@ button { font: inherit; color: inherit; }
   .route input[type=range] { grid-column: 1 / -1; grid-row: 2; }
   .panel { border-right: 0; padding-left: 4px; padding-right: 4px; }
   .revcols { grid-template-columns: minmax(0, 1fr); }
-  .revcols > div { padding: 0; }
-  .revcols > div + div { border-left: 0; border-top: 1px solid var(--hair); padding-top: 16px; margin-top: 16px; }
+  .revcols > .row { padding: 0; flex-wrap: wrap; }
+  .revcols > .row + .row { border-left: 0; border-top: 1px solid var(--hair); padding-top: 14px; margin-top: 14px; }
   .headscols { grid-template-columns: minmax(0, 1fr); }
   .headscols > div { padding: 0; }
   .headscols > div:last-child { border-left: 0; border-top: 1px solid var(--hair); padding-top: 16px; margin-top: 16px; }
@@ -299,7 +310,14 @@ button { font: inherit; color: inherit; }
   <section class="reel" id="reelBox" aria-label="Reel">
     <canvas id="reel" aria-label="Reel waveform with splice markers and the genes playing"></canvas>
     <div class="empty" id="reelEmpty" hidden></div>
-    <div class="hint"><span id="hintL">Click a splice to select it. Drag a marker to move it, double-click to add or remove one.</span><span id="hintR"></span></div>
+    <div class="trim" id="trimBox">
+      <span class="lbl" id="tLbl">Trim splice 1</span>
+      <label>From <input type="range" id="tIn" min="0" max="1000" value="0" aria-label="Trim start"><output id="oIn">+0.00 s</output></label>
+      <label>To <input type="range" id="tOut" min="0" max="1000" value="1000" aria-label="Trim end"><output id="oOut">−0.00 s</output></label>
+      <button class="abtn" id="tApply" type="button" disabled>Cut</button>
+      <button class="abtn" id="tCancel" type="button" disabled>Keep all</button>
+    </div>
+    <div class="hint"><span id="hintL">Click a splice to select it. Drag a marker to move it, double-click to add or remove one. Drag the two handles under the selected splice, or the sliders, to trim it.</span><span id="hintR"></span></div>
   </section>
 
   <div class="readouts" id="readouts" aria-live="off">
@@ -331,15 +349,12 @@ button { font: inherit; color: inherit; }
 
     <section class="panel span-8" aria-labelledby="hRev">
       <h2 id="hRev"><span class="dymo">Reverb</span> <small id="revState">last in the chain, after the heads</small></h2>
+      <canvas class="scope tall" id="rev" aria-label="The reverb: pre-delay, the first reflections and the decay"></canvas>
       <div class="revcols">
-        <div>
-          <canvas class="scope tall" id="rev" aria-label="The reverb: pre-delay, the first reflections and the decay"></canvas>
-          <div class="row" id="gRevB"></div>
-        </div>
-        <div>
-          <div class="row" id="gRev"></div>
-        </div>
+        <div class="row" id="gRevB"></div>
+        <div class="row" id="gRev"></div>
       </div>
+      <div class="row revsw" id="gRevSw"></div>
     </section>
 
     <section class="panel span-12" aria-labelledby="hHeads">
@@ -387,17 +402,6 @@ button { font: inherit; color: inherit; }
         <button class="abtn" id="aDetect" title="Place markers on the transients of the reel">Auto-splice</button>
         <button class="abtn" id="aDivide" title="Replace the markers with equal divisions">Divide now</button>
         <button class="abtn warn" id="aClear" title="Remove every marker">Clear markers</button>
-      </div>
-      <div class="trim" id="trimBox">
-        <div class="lbl">Trim the selected splice: keep only</div>
-        <div class="trows">
-          <label>From <input type="range" id="tIn" min="0" max="1000" value="0" aria-label="Trim start"><output id="oIn">+0.00 s</output></label>
-          <label>To <input type="range" id="tOut" min="0" max="1000" value="1000" aria-label="Trim end"><output id="oOut">−0.00 s</output></label>
-        </div>
-        <div class="actions">
-          <button class="abtn" id="tApply" type="button" disabled>Cut</button>
-          <button class="abtn" id="tCancel" type="button" disabled>Keep all</button>
-        </div>
       </div>
     </section>
 
@@ -701,7 +705,7 @@ const KNOB_TICKS = (function () {
   return t;
 })();
 
-function knob(key, label) {
+function knob(key, label, shown) {
   const d = D[key];
   const el = document.createElement("div");
   el.className = "knob";
@@ -709,7 +713,7 @@ function knob(key, label) {
     '<div class="num"></div><div class="dial" role="slider" tabindex="0" aria-label="' + (label || d.name) + '">' +
     '<svg viewBox="0 0 64 64" aria-hidden="true">' + KNOB_TICKS + '<path class="trk" d="' + arc(32, 32, 29, A0, A1) + '"/>' +
     '<path class="val"/><circle class="cap" cx="32" cy="32" r="17"/><line class="ptr" x1="32" y1="32" x2="32" y2="18"/></svg></div>' +
-    '<div class="lbl">' + (label || d.name.replace(/ \(.*\)$/, "")) + "</div>";
+    '<div class="lbl">' + (shown || label || d.name.replace(/ \(.*\)$/, "")) + "</div>";
   const dial = el.querySelector(".dial"), val = el.querySelector(".val"), ptr = el.querySelector(".ptr"), num = el.querySelector(".num");
   const bip = d.min < 0 && d.max > 0;
   function update() {
@@ -838,13 +842,9 @@ rows("gMicro", [[knob("scatter"), knob("spread", "Spread"), knob("gene_reverse",
   [seg("thr_mode", "Selective: play only the genes that are")],
   [stepper("pattern", "Pattern: repeat every N genes"), stepper("pattern_seed", "Pattern seed")]]);
 put("gEq", [knob("eq_low", "Low"), knob("eq_mid", "Mid"), knob("eq_freq", "Mid freq"), knob("eq_high", "High")]);
-put("gRevB", [knob("rev_mix", "Reverb mix"), knob("rev_size", "Size"), knob("rev_predelay", "Pre-delay"), knob("rev_decay", "Decay")]);
-rows("gRev", [[knob("rev_damp", "Absorb"), knob("rev_depth", "Depth"), knob("rev_speed", "Speed"), knob("rev_tilt", "Tilt")],
-  [seg("rev_reverse", "Reverse: the pre-delay backwards")]]);
-document.getElementById("gRev").insertAdjacentElement("afterend", (function () {
-  const r = document.createElement("div"); r.className = "row";
-  r.appendChild(seg("fx_rec", "Record through FX")); r.classList.add("gap"); return r;
-})());
+put("gRevB", [knob("rev_mix", "Reverb mix", "Mix"), knob("rev_size", "Size"), knob("rev_predelay", "Pre-delay", "Predelay"), knob("rev_decay", "Decay")]);
+put("gRev", [knob("rev_damp", "Absorb"), knob("rev_depth", "Depth"), knob("rev_speed", "Speed"), knob("rev_tilt", "Tilt")]);
+put("gRevSw", [seg("rev_reverse", "Reverse: the pre-delay backwards"), seg("fx_rec", "Record through FX")]);
 rows("gHeads", [[knob("hd_mix", "Heads mix"), knob("hd_spacing", "Spacing"), knob("hd_fdbk", "Feedback"), knob("hd_reverse", "Reverse"), knob("hd_wear_amt", "Wear")],
   [stepper("hd_time", "Time"), stepper("hd_heads", "Heads per side")]]);
 rows("gHeadsB", [[seg("hd_wear", "Wear: what each pass does")], [seg("hd_mode", "Mode")], [seg("hd_route", "Routing")], [seg("hd_freeze", "Freeze")]]);
@@ -852,7 +852,7 @@ rows("gPlay", [[seg("pad_mode"), seg("play_mode")], [knob("volume"), knob("relea
   [stepper("root_note", "Root note"), stepper("octave_transpose", "Octave"), stepper("bend_range", "Bend range")]]);
 rows("gSplices", [[seg("splice_source"), stepper("divide", "Divide into"), stepper("splice_base", "Splice pad base")],
   [knob("mcr1", "Chord 2nd"), knob("mcr2", "Chord 3rd"), knob("mcr3", "Chord 4th")]]);
-rows("gRec", [[knob("sos", "Sound on sound"), seg("in_gain"), seg("rec_source")], [seg("rec_sync", "Record sync"), seg("save_48k")],
+rows("gRec", [[knob("sos", "Sound on sound", "SOS"), seg("in_gain"), seg("rec_source")], [seg("rec_sync", "Record sync"), seg("save_48k")],
   [seg("rec_length", "Record length"), seg("rec_after", "After recording")], [seg("rec_head", "Overdub head")],
   [seg("rec_trim", "Trim key noise (start and end of a recording)")]]);
 rows("gMod0", [[seg("mod_wave_shape", "Wave shape", ["Sine", "Tri", "Up", "Down", "Square"])], [knob("mod_wave_rate", "Rate")],
@@ -886,7 +886,7 @@ function fit(cv) {
 /* ---- the reel: waveform, grease-pencil splice marks, genes, record head */
 const reelCv = document.getElementById("reel");
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const view = { hover: -1, drag: null };
+const view = { hover: -1, drag: null, trim: -1, trimHover: -1 };
 function xOf(f, w) { return 6 + (w - 12) * f / Math.max(1, reelFrames()); }
 function fOf(x, w) { return clamp((x - 6) / (w - 12), 0, 1) * reelFrames(); }
 
@@ -967,12 +967,19 @@ function drawReel() {
     g.fillStyle = COL.grease; g.beginPath(); g.arc(x, mid, 2.6, 0, Math.PI * 2); g.fill();
     g.fillRect(x - 0.6, mid - amp - 6, 1.2, 2 * amp + 12);
   });
-  /* trimming: what will go is greyed out */
-  if (TR.on && TR.sel === s.i) {
-    const f = trimFrames(), xa = xOf(f.a, w), xb = xOf(f.b, w);
-    g.fillStyle = "rgba(0, 0, 0, .62)";
-    g.fillRect(x0, top, xa - x0, h - top); g.fillRect(xb, top, x1 - xb, h - top);
-    g.fillStyle = COL.red; g.fillRect(xa - 1, top, 2, h - top); g.fillRect(xb - 1, top, 2, h - top);
+  /* trimming: what will go is greyed out; two handles under the splice */
+  {
+    const [xa, xb] = trimHandleX(w), on = TR.on && TR.sel === s.i;
+    if (on) {
+      g.fillStyle = "rgba(0, 0, 0, .62)";
+      g.fillRect(x0, top, xa - x0, h - top); g.fillRect(xb, top, x1 - xb, h - top);
+      g.fillStyle = COL.red; g.fillRect(xa - 1, top, 2, h - top); g.fillRect(xb - 1, top, 2, h - top);
+    }
+    g.fillStyle = COL.red; g.globalAlpha = on || view.trimHover >= 0 ? 1 : 0.7;
+    for (const [x, dir] of [[xa, 1], [xb, -1]]) {
+      g.beginPath(); g.moveTo(x, h - 2); g.lineTo(x, h - 18); g.lineTo(x + dir * 10, h - 2); g.closePath(); g.fill();
+    }
+    g.globalAlpha = 1;
   }
   /* record head */
   if (L.rec) {
@@ -988,21 +995,34 @@ function hitMarker(x, w) {
   L.mk.forEach((m, i) => { const d = Math.abs(xOf(m, w) - x); if (d < bd) { bd = d; best = i; } });
   return best;
 }
+function trimDragTo(which, x, w) {
+  const s = selected(), sp = Math.max(1, s.hi - s.lo), t = clamp((fOf(x, w) - s.lo) / sp, 0, 1);
+  if (!(TR.on && TR.sel === s.i)) { TR.a = 0; TR.b = 1; }
+  if (which === 0) TR.a = Math.min(t, TR.b - trimGap()); else TR.b = Math.max(t, TR.a + trimGap());
+  TR.a = Math.max(0, TR.a); TR.b = Math.min(1, TR.b);
+  TR.on = true; TR.sel = s.i;
+  trimUpdate(true);
+}
 reelCv.addEventListener("pointermove", (e) => {
-  const r = reelCv.getBoundingClientRect(), x = e.clientX - r.left;
+  const r = reelCv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  if (view.trim !== undefined && view.trim >= 0) { trimDragTo(view.trim, x, r.width); return; }
   if (view.drag) { view.drag.f = Math.round(fOf(x, r.width)); L.mk[view.drag.i] = view.drag.f; return; }
-  const m = hitMarker(x, r.width);
-  if (m !== view.hover) { view.hover = m; reelCv.style.cursor = m >= 0 ? "ew-resize" : "pointer"; }
+  const t = hitTrim(x, y, r.width, r.height);
+  const m = t >= 0 ? -1 : hitMarker(x, r.width);
+  if (m !== view.hover || t !== view.trimHover) { view.hover = m; view.trimHover = t; reelCv.style.cursor = m >= 0 || t >= 0 ? "ew-resize" : "pointer"; }
 });
 reelCv.addEventListener("pointerdown", (e) => {
   if (reelFrames() < 2) return;
   const r = reelCv.getBoundingClientRect(), x = e.clientX - r.left;
+  const t = hitTrim(x, e.clientY - r.top, r.width, r.height);
+  if (t >= 0) { reelCv.setPointerCapture(e.pointerId); view.trim = t; trimDragTo(t, x, r.width); return; }
   const m = hitMarker(x, r.width);
   if (m >= 0) { reelCv.setPointerCapture(e.pointerId); view.drag = { i: m, f: L.mk[m], x0: x }; return; }
   const f = fOf(x, r.width), b = bounds();
   for (let i = 0; i < b.length - 1; i++) if (f >= b[i] && f < b[i + 1]) { L.sel = i; act("sel_splice", i); break; }
 });
 reelCv.addEventListener("pointerup", (e) => {
+  if (view.trim !== undefined && view.trim >= 0) { view.trim = -1; return; }
   if (!view.drag) return;
   const d = view.drag; view.drag = null;
   const r = reelCv.getBoundingClientRect();
@@ -1011,6 +1031,7 @@ reelCv.addEventListener("pointerup", (e) => {
 reelCv.addEventListener("dblclick", (e) => {
   if (reelFrames() < 2) return;
   const r = reelCv.getBoundingClientRect(), x = e.clientX - r.left;
+  if (hitTrim(x, e.clientY - r.top, r.width, r.height) >= 0) return;
   const m = hitMarker(x, r.width);
   if (m >= 0) { act("marker_del", m); toast("Marker removed"); }
   else if ((P.splice_source | 0) === 0) { act("marker_add", Math.round(fOf(x, r.width))); toast("Marker added"); }
@@ -1295,7 +1316,7 @@ function setWhere() {
   t.textContent = gotData ? "Heimat, live" : "Waiting for Heimat";
 }
 function setMode() {
-  document.getElementById("hintL").textContent = "Click a splice to select it. Drag a marker to move it, double-click to add or remove one.";
+  document.getElementById("hintL").textContent = "Click a splice to select it. Drag a marker to move it, double-click to add or remove one. Drag the two handles under the selected splice, or the sliders, to trim it.";
   document.getElementById("foot").textContent = mode === "solo"
     ? "Changes go straight to the Move and the Move's own screen follows them. Schwung's Master FX processes Heimat with the rest of the Move."
     : "This is a demo with a made-up reel. On the Move, open schwung-manager at move.local:7700, then Remote UI: Heimat is under the Tool tab.";
@@ -1410,6 +1431,8 @@ function trimFrames() {
 }
 function trimUpdate(send_) {
   const { s, a, b } = trimFrames(), sr = L.sr || SR0;
+  document.getElementById("tLbl").textContent = "Trim splice " + (s.i + 1);
+  document.getElementById("tIn").value = Math.round(TR.a * 1000); document.getElementById("tOut").value = Math.round(TR.b * 1000);
   document.getElementById("oIn").textContent = "+" + ((a - s.lo) / sr).toFixed(2) + " s";
   document.getElementById("oOut").textContent = "−" + ((s.hi - b) / sr).toFixed(2) + " s";
   document.getElementById("tApply").disabled = !TR.on;
@@ -1420,6 +1443,19 @@ function trimUpdate(send_) {
     else if (!TR.pend) { TR.pend = 1; setTimeout(() => { TR.pend = 0; TR.at = nowMs(); const f = trimFrames(); act("trim_set", f.a + "," + f.b); }, 45); }
   }
 }
+function trimGap() { const s = selected(); return Math.min(0.5, 4096 / Math.max(1, s.hi - s.lo)); }
+/* the two handles under the selected splice, on the reel */
+function trimHandleX(w) {
+  const s = selected(), sp = s.hi - s.lo, on = TR.on && TR.sel === s.i;
+  return [xOf(s.lo + sp * (on ? TR.a : 0), w), xOf(s.lo + sp * (on ? TR.b : 1), w)];
+}
+function hitTrim(x, y, w, h) {
+  if (reelFrames() < 2 || y < h - 22) return -1;
+  const [xa, xb] = trimHandleX(w);
+  const da = Math.abs(x - xa), db = Math.abs(x - xb);
+  if (Math.min(da, db) > 12) return -1;
+  return da <= db ? 0 : 1;
+}
 function trimReset() {
   TR.on = false; TR.a = 0; TR.b = 1;
   document.getElementById("tIn").value = 0; document.getElementById("tOut").value = 1000;
@@ -1427,7 +1463,7 @@ function trimReset() {
 }
 (function () {
   const tIn = document.getElementById("tIn"), tOut = document.getElementById("tOut");
-  const minGap = () => { const s = selected(); return Math.min(0.5, 4096 / Math.max(1, s.hi - s.lo)); };
+  const minGap = trimGap;
   tIn.addEventListener("input", () => { TR.a = Math.min(+tIn.value / 1000, TR.b - minGap()); tIn.value = Math.round(TR.a * 1000); TR.on = true; TR.sel = selected().i; trimUpdate(true); });
   tOut.addEventListener("input", () => { TR.b = Math.max(+tOut.value / 1000, TR.a + minGap()); tOut.value = Math.round(TR.b * 1000); TR.on = true; TR.sel = selected().i; trimUpdate(true); });
   document.getElementById("tApply").addEventListener("click", () => {
