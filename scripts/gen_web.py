@@ -31,10 +31,10 @@ GROUPS = [
     ('Modulators', ['mod_wave_shape', 'mod_wave_rate', 'mod_wave_sync', 'mod_wave_retrig',
                     'mod_rand_rate', 'mod_rand_smooth', 'mod_rand_sync', 'mod_rand_retrig',
                     'mod_follow_src', 'mod_follow_gain', 'mod_follow_attack', 'mod_follow_release',
-                    'mod_env_attack', 'mod_env_decay', 'mod_env_mode', 'mod_env_trigger']),
-    ('Play', ['pad_mode', 'play_mode', 'release_ms', 'root_note', 'octave_transpose', 'bend_range', 'volume', 'mute']),
+                    'mod_env_attack', 'mod_env_decay', 'mod_env_mode', 'mod_env_trigger', 'mod_restart']),
+    ('Play', ['pad_mode', 'play_mode', 'filter', 'release_ms', 'root_note', 'octave_transpose', 'bend_range', 'volume', 'mute']),
     ('Splices and chords', ['splice_source', 'divide', 'splice_base', 'mcr1', 'mcr2', 'mcr3']),
-    ('Recording', ['sos', 'in_gain', 'rec_source', 'rec_sync', 'rec_length', 'rec_after', 'rec_head', 'rec_trim',
+    ('Recording', ['sos', 'in_gain', 'rec_source', 'rec_sync', 'rec_length', 'rec_after', 'rec_head', 'rec_trim', 'in_gate',
                    'fx_rec', 'save_48k']),
     ('Clock', ['clock_source', 'clock_div', 'clock_mode', 'bpm']),
 ]

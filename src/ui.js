@@ -129,6 +129,9 @@ const PD = {
     rec_after:   { t: 'e', opts: ['PLAY', 'OVERDUB'], lab: 'AFTR', name: 'After Recording' },
     rec_head:    { t: 'e', opts: ['STEADY', 'VARI'], lab: 'HEAD', name: 'Overdub Head' },
     rec_trim:    { t: 'e', opts: ['OFF', '50MS', '100MS', '200MS', '300MS', '500MS'], lab: 'KEYS', name: 'Trim Key Noise' },
+    filter:      { t: 'f', min: -1, max: 1, lab: 'FILT', name: 'Filter' },
+    mod_restart: { t: 'e', opts: ['OFF', 'ON'], lab: 'MRST', name: 'Restart Mods On Clock' },
+    in_gate:     { t: 'e', opts: ['OFF', '-70DB', '-60DB', '-50DB', '-40DB'], lab: 'GATE', name: 'Input Gate' },
     mod_wave_shape: { t: 'e', opts: ['SINE', 'TRI', 'UP', 'DOWN', 'SQR'], lab: 'SHP', name: 'Wave Shape' },
     mod_wave_rate:  { t: 'f', min: 0, max: 1, lab: 'RATE', name: 'Wave Rate' },
     mod_wave_sync:  { t: 'e', opts: ['FREE', '4BAR', '2BAR', '1BAR', '1/2', '1/4', '1/8', '1/16'], lab: 'SYNC', name: 'Wave Sync' },
@@ -158,19 +161,19 @@ const DEFAULTS = {
     pattern: 0, pattern_seed: 1, rec_length: 0, rec_after: 0, rec_head: 0,
     mod_wave_shape: 0, mod_wave_rate: 0.4, mod_wave_sync: 0, mod_wave_retrig: 0, mod_rand_rate: 0.4, mod_rand_smooth: 0,
     mod_rand_sync: 0, mod_rand_retrig: 0, mod_follow_src: 0, mod_follow_gain: 0.5, mod_follow_attack: 0.1, mod_follow_release: 0.4,
-    mod_env_attack: 0.1, mod_env_decay: 0.4, mod_env_mode: 0, mod_env_trigger: 0, rec_trim: 0,
+    mod_env_attack: 0.1, mod_env_decay: 0.4, mod_env_mode: 0, mod_env_trigger: 0, rec_trim: 0, in_gate: 2, filter: 0, mod_restart: 0,
 };
 
 /* the eight cells of each page = the eight encoders */
 const PAGES = {
-    play:  ['gene_size', 'slide', 'morph', 'vari_speed', 'organize', 'sos', 'volume', 'clock_div'],
+    play:  ['gene_size', 'slide', 'morph', 'vari_speed', 'organize', 'filter', 'volume', 'clock_div'],
     reel:  ['@splice', '@start', '@end', '@zoom', '@sens', '@divide', 'gene_size', 'slide'],
     rec:   ['sos', 'in_gain', 'rec_source', 'rec_sync', 'clock_source', 'bpm', 'clock_div', 'clock_mode'],
     mod: [
         ['mod_wave_shape', 'mod_wave_rate', 'mod_wave_sync', 'mod_wave_retrig', 'mod_rand_rate', 'mod_rand_smooth', 'mod_rand_sync', 'mod_rand_retrig'],
         ['mod_follow_src', 'mod_follow_gain', 'mod_follow_attack', 'mod_follow_release', 'mod_env_attack', 'mod_env_decay', 'mod_env_mode', 'mod_env_trigger'],
     ],
-    loop:  ['rec_length', 'rec_after', 'rec_head', 'rec_trim', 'rec_sync', 'sos', 'bpm', 'vari_speed'],
+    loop:  ['rec_length', 'rec_after', 'rec_head', 'rec_trim', 'rec_sync', 'sos', 'bpm', 'in_gate'],
     setup: [
         ['gene_window', 'scatter', 'spread', 'width', 'threshold', 'thr_mode', 'spread_mode', 'gene_reverse'],
         ['pattern', 'pattern_seed', 'scatter', 'spread', 'spread_mode', 'gene_reverse', 'width', 'gene_window'],
@@ -180,7 +183,7 @@ const PAGES = {
         ['rev_mix', 'rev_size', 'rev_predelay', 'rev_decay', 'rev_damp', 'rev_depth', 'rev_speed', 'rev_tilt'],
         ['rev_reverse', 'rev_predelay', 'rev_size', 'rev_decay', 'rev_damp', 'rev_tilt', 'rev_mix', 'fx_rec'],
         ['pad_mode', 'play_mode', 'root_note', 'octave_transpose', 'splice_base', 'organize_mode', 'bend_range', 'release_ms'],
-        ['splice_source', 'divide', 'mcr1', 'mcr2', 'mcr3', 'save_48k', 'mute', 'volume'],
+        ['splice_source', 'divide', 'mcr1', 'mcr2', 'mcr3', 'save_48k', 'mute', 'mod_restart'],
     ],
 };
 const VIRT = {
@@ -217,20 +220,43 @@ function routeAmt(src, key) { const r = routes.find((x) => x.s === src && x.k ==
 function isModulated(key) { return routes.some((x) => x.k === key); }
 function readRoutes() {
     const raw = getParam('mod_routes');
-    routes = raw ? raw.split(',').map((t) => { const [k, s, a] = t.split(':'); return { k, s: +s, a: +a }; }).filter((r) => PD[r.k] && Number.isFinite(r.a)) : [];
+    routes = raw ? raw.split(',').map((t) => { const [k, s, a, b] = t.split(':'); return { k, s: +s, a: +a, b: b === undefined ? (+s < 2 ? 1 : 0) : +b }; }).filter((r) => PD[r.k] && Number.isFinite(r.a)) : [];
 }
 function setRoute(src, key, amt) {
     amt = Math.max(-1, Math.min(1, Math.round(amt * 100) / 100));
     const i = routes.findIndex((x) => x.s === src && x.k === key);
     if (Math.abs(amt) < 0.005) { if (i >= 0) routes.splice(i, 1); }
     else if (i >= 0) routes[i].a = amt;
-    else if (routes.length < 16) routes.push({ k: key, s: src, a: amt });
+    else if (routes.length < 16) routes.push({ k: key, s: src, a: amt, b: src < 2 ? 1 : 0 });
     else { say('16 ROUTES AT MOST'); return; }
     lastLocalEdit = Date.now();
     setParam('mod_set', src + ' ' + key + ' ' + amt.toFixed(2));
     const pct = Math.round(amt * 100);
     say(MOD_NAMES[src] + ' > ' + PD[key].lab + ' ' + (pct > 0 ? '+' : '') + pct + '%', 900);
 }
+/* where the modulation has taken each modulated control right now (from the DSP) */
+let liveVals = {};
+function readLive() {
+    liveVals = {};
+    if (!routes.length) return;
+    const raw = getParam('mod_live');
+    if (raw) for (const t of raw.split(',')) { const [k, v] = t.split(':'); if (PD[k]) liveVals[k] = +v; }
+}
+/* hold a Track and touch a knob without turning it: the route swings both ways, or only one */
+let touchPol = null;                           /* {i, turned} */
+function togglePolarity(src, key) {
+    const r = routes.find((x) => x.s === src && x.k === key);
+    if (!r) { say(MOD_NAMES[src] + ': NO ROUTE ON ' + PD[key].lab, 900); return; }
+    r.b = r.b ? 0 : 1;
+    lastLocalEdit = Date.now();
+    setParam('mod_pol', src + ' ' + key);
+    focus.idx = -1; focus.until = 0;                  /* the message, not the knob's reading */
+    say(MOD_NAMES[src] + ' > ' + PD[key].lab + (r.b ? ' BOTH WAYS' : ' ONE WAY'), 1400);
+}
+/* TEMP: hold Undo and change anything, let go and it all comes back;
+ * Shift + Undo keeps it on until Undo again. A plain tap of Undo still undoes. */
+let undoHold = null, tempLatched = false;
+function tempUsed() { if (undoHold) undoHold.used = true; }
 const PAGE_ORDER = ['play', 'reel', 'rec', 'setup'];
 
 /* ------------------------------------------------------------------ state */
@@ -307,6 +333,7 @@ function pollDsp(now) {
         if (now - lastLocalEdit > 600) readAllParams();
     }
     if (S.mrv !== undefined && S.mrv !== lastMrv && now - lastLocalEdit > 600) { lastMrv = S.mrv; readRoutes(); }
+    readLive();
     if (S.mv !== lastMv) {
         lastMv = S.mv;
         const csv = getParam('markers');
@@ -388,6 +415,12 @@ function fmtParam(key) {
     if (d.t === 'i') return String(v | 0);
     if (key === 'vari_speed') return (v >= 0 ? '+' : '') + v.toFixed(2);
     if (key === 'release_ms') return (v | 0) + 'ms';
+    if (key === 'filter') {
+        const ax = Math.abs(v);
+        if (ax < 0.004) return 'OPEN';
+        const fc = v < 0 ? 20000 * Math.pow(2, -9 * ax) : 20 * Math.pow(2, 9 * ax);
+        return (v < 0 ? 'LP ' : 'HP ') + (fc >= 1000 ? (fc / 1000).toFixed(fc >= 10000 ? 0 : 1) + 'k' : Math.round(fc));
+    }
     if (key === 'mod_wave_rate' || key === 'mod_rand_rate') {
         const sy = P[key === 'mod_wave_rate' ? 'mod_wave_sync' : 'mod_rand_sync'] | 0;
         if (sy) return PD.mod_wave_sync.opts[sy];
@@ -461,6 +494,7 @@ function drawHeader() {
     if (S.sv === 1) lamp('SD', blink);
     if ((S.cr | 0) && (P.clock_source | 0)) lamp(S.act === 1 ? 'GS' : (S.act === 2 ? 'TS' : 'CK'), (S.ck | 0) % 2 === 1);
     if (P.mute) lamp('M', true);
+    if (undoHold || tempLatched || S.tmp) lamp('TMP', true);
     hline(0, W - 1, 9);
 }
 
@@ -549,7 +583,15 @@ function drawCells() {
         const filled = Math.round(27 * Math.max(0, Math.min(1, frac)));
         if (filled > 0) fill_rect(x + 2, by - 1, filled, 2, ink);
         if (!virt && PD[key].min < 0) vline(x + 15, by - 2, by, ink);
-        if (!virt && isModulated(key)) vline(x, y + 1, y + CELL_H - 1, ink);   /* modulated: a flag down the left edge */
+        if (!virt && isModulated(key)) {
+            vline(x, y + 1, y + CELL_H - 1, ink);                            /* modulated: a flag down the left edge */
+            if (liveVals[key] !== undefined) {                                /* and a tick above the bar: where it is right now */
+                const d = PD[key], lf = (liveVals[key] - d.min) / (d.max - d.min);
+                const lx = x + 2 + Math.round(27 * Math.max(0, Math.min(1, lf)));
+                const inside = lx < x + 2 + filled;                           /* in the filled bar: a notch cut out of it */
+                px(lx, by - 2, ink); px(lx, by - 1, inside ? 1 - ink : ink); px(lx, by, inside ? 1 - ink : ink);
+            }
+        }
     }
     vline(127, CELL_Y, H - 1, 0);
 }
@@ -909,7 +951,7 @@ function drawSetup() {
 }
 
 const MENU = ['Load WAV...', 'New empty reel', 'Save reel', 'Auto-splice', 'Clear all markers', 'Undo', 'Clear heads', 'Trim splice...', 'About / DSP load'];
-const VERSION = '0.12.1';
+const VERSION = '0.14.0';
 
 /* version and the load meter, for beta reports: Heimat's own share of each
  * block's real time (average, recent peak) and the blocks that ran over */
@@ -1239,6 +1281,9 @@ function turnKnob(i, raw) {
     const key = pageKeys()[i];
     const delta = moveInputFilter.decodeDelta(raw);                  /* detents in this event, signed */
     if (!delta) return;
+    tempUsed();
+    if (touchPol && touchPol.i === i) touchPol.turned = true;
+    if (deleteDown && !deleteDown.fired) { resetToDefault(key, i); return; }
     if (trackHold) {                                                  /* holding a modulator: set its depth on this control */
         trackHold.used = true;
         const d = PD[key];
@@ -1273,12 +1318,22 @@ function turnKnob(i, raw) {
     setP(key, v);
 }
 
+/* hold Delete and turn or touch a knob: its control goes back to where it starts */
+function resetToDefault(key, i) {
+    deleteDown.used = true;
+    if (!key || key[0] === '@' || !PD[key] || DEFAULTS[key] === undefined) return;
+    if (P[key] !== DEFAULTS[key]) setP(key, DEFAULTS[key]);
+    focus.idx = i; focus.until = Date.now() + FOCUS_TURN_MS;
+    say(PD[key].lab + ' RESET', 800);
+}
+
 function showTouched(i) {
     focus.idx = i; focus.until = Date.now() + FOCUS_TOUCH_MS;
 }
 
 function pressButton(cc) {
     if (cc === MoveShift) return;
+    if (cc !== MoveUndo) tempUsed();
     const rowIdx = ROWS.indexOf(cc);
     if (rowIdx >= 0 && overlay === 'trim') cancelTrim();
     if (rowIdx >= 0 && !shiftHeld && !overlay) { trackHold = { n: rowIdx, used: false }; return; }   /* a page on release, a modulator while held */
@@ -1302,7 +1357,12 @@ function pressButton(cc) {
     if (cc === MoveRec) setParam(shiftHeld ? 'rec_toggle_new' : 'rec_toggle', 1);
     else if (cc === MoveSample) setParam('rec_toggle_new', 1);
     else if (cc === MoveCapture) dropMarker();
-    else if (cc === MoveUndo) { setParam('undo', 1); say('UNDO'); }
+    else if (cc === MoveUndo && shiftHeld) {
+        if (tempLatched) { tempLatched = false; setParam('temp', 'end'); say('TEMP: ALL BACK'); }
+        else { tempLatched = true; setParam('temp', 'begin'); say('TEMP ON: UNDO TO GO BACK', 1500); }
+    }
+    else if (cc === MoveUndo && tempLatched) { tempLatched = false; setParam('temp', 'end'); say('TEMP: ALL BACK'); }
+    else if (cc === MoveUndo) { undoHold = { used: false }; setParam('temp', 'begin'); }
     else if (cc === MovePlay) { setParam('play_latch', S.run ? 0 : 1); }
     else if (cc === MoveMute) setP('mute', P.mute ? 0 : 1);
     else if (cc === MoveLoop) {
@@ -1346,6 +1406,13 @@ function openPage(rowIdx) {
     peaksKey = '';
 }
 function releaseButton(cc) {
+    if (cc === MoveUndo && undoHold) {
+        const used = undoHold.used;
+        undoHold = null;
+        if (used) { setParam('temp', 'end'); say('TEMP: ALL BACK'); }
+        else { setParam('temp', 'cancel'); setParam('undo', 1); say('UNDO'); }
+        return;
+    }
     const rowIdx = ROWS.indexOf(cc);
     if (rowIdx >= 0 && trackHold && trackHold.n === rowIdx) {
         const used = trackHold.used;
@@ -1354,7 +1421,7 @@ function releaseButton(cc) {
         return;
     }
     if (cc === MoveDelete && deleteDown) {
-        if (!deleteDown.fired && !overlay) deleteMarker();
+        if (!deleteDown.fired && !deleteDown.used && !overlay) deleteMarker();
         deleteDown = null;
     }
 }
@@ -1412,7 +1479,7 @@ globalThis.init = function () {
     if (typeof moveInputFilter.invalidateLedCache === 'function') moveInputFilter.invalidateLedCache();
     ledSent.clear();
     readAllParams();
-    page = 'play'; setupPage = 0; recPage = 0; modPage = 0; trackHold = null; routes = []; lastMrv = -1; overlay = null; shiftHeld = false; ticks = 0;
+    page = 'play'; setupPage = 0; recPage = 0; modPage = 0; trackHold = null; routes = []; lastMrv = -1; liveVals = {}; undoHold = null; tempLatched = false; touchPol = null; overlay = null; shiftHeld = false; ticks = 0;
     touched.fill(false); heldPads.clear(); pads.clear(); deleteDown = null; focus.idx = -1; focus.until = 0;
     cursor = 0; zoomLevel = 0; peaksKey = ''; lastMv = -1; lastSv = 0; lastPg = -1; lastLocalEdit = 0; pendingDivide = null;
     pollDsp(Date.now());
@@ -1424,7 +1491,8 @@ globalThis.tick = function () {
     ticks++;
     if (now - lastPoll >= 33) { lastPoll = now; pollDsp(now); sampleMods(); }
     if (pendingDivide && now - pendingDivide.t > 450) { setParam('markers_divide', pendingDivide.n); pendingDivide = null; }
-    if (deleteDown && !deleteDown.fired) {
+    if (deleteDown && !deleteDown.fired && deleteDown.used) deleteDown.armed = false;
+    else if (deleteDown && !deleteDown.fired) {
         const held = now - deleteDown.t;
         deleteDown.armed = held > 350;
         if (held >= deleteDown.hold) {
@@ -1449,10 +1517,21 @@ globalThis.onMidiMessageInternal = function (data) {
         const on = status === 0x90 && d2 > 0;
         if (d1 >= 0 && d1 <= 7) {
             touched[d1] = on;
-            if (on) showTouched(d1);
+            if (on) {
+                showTouched(d1);
+                if (deleteDown && !deleteDown.fired && !overlay) resetToDefault(pageKeys()[d1], d1);
+                if (trackHold) touchPol = { i: d1, turned: false };
+            } else if (touchPol && touchPol.i === d1) {
+                if (trackHold && !touchPol.turned && !overlay) {
+                    const key = pageKeys()[d1];
+                    trackHold.used = true;
+                    if (key && key[0] !== '@' && PD[key]) togglePolarity(trackHold.n, key);
+                }
+                touchPol = null;
+            }
             return;
         }
-        if (d1 >= PAD0 && d1 < PAD0 + PAD_N) { if (on) padDown(d1 - PAD0); else padUp(d1 - PAD0); return; }
+        if (d1 >= PAD0 && d1 < PAD0 + PAD_N) { if (on) { tempUsed(); padDown(d1 - PAD0); } else padUp(d1 - PAD0); return; }
         if (d1 >= STEP0 && d1 < STEP0 + STEP_N) {
             if (on && !overlay) selectSplice(Math.floor((S.sel | 0) / STEP_N) * STEP_N + (d1 - STEP0));
             return;
@@ -1462,7 +1541,7 @@ globalThis.onMidiMessageInternal = function (data) {
     if (status !== 0xB0) return;
     if (d1 === MoveShift) { shiftHeld = d2 > 0; return; }
     if (d1 >= MoveKnob1 && d1 < MoveKnob1 + 8) { if (overlay === 'trim') trimKnob(d1 - MoveKnob1, d2); else if (!overlay) turnKnob(d1 - MoveKnob1, d2); return; }
-    if (d1 === MoveMainKnob) { jogTurn(d2); return; }
+    if (d1 === MoveMainKnob) { tempUsed(); jogTurn(d2); return; }
     if (d1 === MoveMainButton) { if (d2 > 0) jogClick(); return; }
     if (d2 > 0) pressButton(d1); else releaseButton(d1);
 };

@@ -243,7 +243,7 @@ footer .word { font: 400 30px/1 var(--mark); color: var(--silk); margin-bottom: 
 <div class="wrap">
   <header>
     <div class="mast">
-      <span class="silk">Operation manual for version 0.12.1</span>
+      <span class="silk">Operation manual for version 0.14.0</span>
       <a href="https://github.com/CairnDebil/schwung-heimat">Source on GitHub</a>
     </div>
     <div class="hero">
@@ -445,6 +445,23 @@ footer .word { font: 400 30px/1 var(--mark); color: var(--silk); margin-bottom: 
       </div>
     </section>
 
+    <section class="s" id="temp">
+      <h2 class="h">Playing safely</h2>
+      <p class="lead">Three gestures make it safe to push things: you can always get back.</p>
+      <div class="twocol">
+        <div>
+          <h3>TEMP</h3>
+          <p>Hold <kbd>Undo</kbd> and change anything: knobs, pads, pages, routes. Let go and every knob, choice and route is back where it was when you pressed. <kbd>Shift</kbd> + <kbd>Undo</kbd> keeps it on (TMP in the header) until you press <kbd>Undo</kbd> again. A plain tap of <kbd>Undo</kbd> still undoes.</p>
+          <h3>Back to the start value</h3>
+          <p>Hold <kbd>Delete</kbd> and turn or touch a knob: that control goes back to where it starts. Delete then does nothing else when you let go.</p>
+        </div>
+        <div>
+          <h3>DJ filter</h3>
+          <p>Knob 6 on PLAY, last before the output. To the left a low-pass, from 20 kHz down to 40 Hz; to the right a high-pass, from 20 Hz up to 10 kHz; in the middle nothing. The resonance grows as it closes. Like any continuous control it can be modulated.</p>
+        </div>
+      </div>
+    </section>
+
     <section class="s" id="mods">
       <h2 class="h">Modulators</h2>
       <p class="lead">Four sources that move the controls for you. A route adds a source to a control on top of where its knob stands; the knob itself stays put, and that is what is saved.</p>
@@ -462,6 +479,7 @@ footer .word { font: 400 30px/1 var(--mark); color: var(--silk); margin-bottom: 
         <div>
           <h3>Routing</h3>
           <p>Hold <kbd>Track 1</kbd> (Wave), <kbd>Track 2</kbd> (Random), <kbd>Track 3</kbd> (Follow) or <kbd>Track 4</kbd> (Envelope) and turn a knob: the turn sets how far that source moves the control, from −100% to +100% of its range. Turn back to zero to remove the route. Let go without turning and the button changes page as usual.</p>
+          <p>Each route swings both ways around the knob or pushes one way only: hold the Track button and touch the knob without turning it to switch. Wave and Random start both ways, Follow and Envelope one way. Above the bar of a modulated cell a tick shows where the control is right now.</p>
           <p>A modulated cell carries a flag down its left edge. Hold a Track button and press <kbd>Delete</kbd> to remove all of that source's routes. Up to sixteen routes; choices such as the envelope shape or the clock source cannot be modulated. The browser editor lists the routes with a depth slider each, and adds new ones.</p>
         </div>
       </div>
@@ -481,6 +499,8 @@ footer .word { font: 400 30px/1 var(--mark); color: var(--silk); margin-bottom: 
           <h3>Looper tape</h3>
           <p>The LOOP page (Track 3 twice) turns recording into a looper. Record Length stops a new-splice recording by itself after 1, 2, 4, 8 or 16 bars at Heimat's tempo; Free waits for you. After Recording decides what follows: Play the new splice, or Overdub, which goes straight on recording over the loop just closed until you stop it, whether the loop ended by itself or you closed it.</p>
           <p>Overdub Head decides how the write head moves when you record over a splice. Steady writes at the speed of time, whatever the playback does. Vari-Speed runs it with the tape: overdub at half speed and it comes back an octave up, overdub backwards and it plays forwards, stop the tape and nothing is written.</p>
+          <h3>Input Gate</h3>
+          <p>Whatever comes in goes through the effects, and a long reverb or the heads at high feedback make the faint hiss of a microphone or a quiet line ring on. The Input Gate (LOOP page, -60 dB to start with) lets the input fade when it falls below its threshold: 40 dB down once it is 6 dB under it, after a short hold, and open again in half a millisecond. Off, -70, -60, -50 or -40 dB.</p>
           <h3>Trimming</h3>
           <p>Recording on the Move itself means the buttons you press can end up on the tape. Two ways out. <b>Trim Key Noise</b> (LOOP page) skips 50 to 500 ms at the start of a recording and takes as much off the end: a new splice gets shorter, an overdub gets back what was there before. It only acts when you press: a start or stop on a clock tick, or at the end of a Record Length, is left alone.</p>
           <p><b>Trim splice</b> (<kbd>Shift</kbd> + <kbd>Capture</kbd>, or the menu) keeps only part of the selected splice. Knob 1 moves the start, knob 2 the end, knob 3 zooms on the last point moved and the jog nudges it; what will go is drawn dotted, and the genes already play only what will stay. Jog click or <kbd>Capture</kbd> cuts, with a short fade at each cut; <kbd>Back</kbd> leaves everything as it was; <kbd>Undo</kbd> brings the cut back. The rest of the reel moves up, and its markers with it. The browser editor has the same two sliders under Splices.</p>
@@ -643,9 +663,11 @@ footer .word { font: 400 30px/1 var(--mark); color: var(--silk); margin-bottom: 
 <tr><td>Envelope Decay</td><td><code>mod_env_decay</code></td><td>0 to 1</td><td>0.4</td></tr>
 <tr><td>Envelope Mode</td><td><code>mod_env_mode</code></td><td>AD / Hold / Loop</td><td>AD</td></tr>
 <tr><td>Envelope Trigger</td><td><code>mod_env_trigger</code></td><td>Pads / Clock / Pads + Clock</td><td>Pads</td></tr>
+<tr><td>Restart Mods On Clock</td><td><code>mod_restart</code></td><td>Off / On</td><td>Off</td></tr>
 <tr class="grp"><th colspan="4" scope="rowgroup">Play</th></tr>
 <tr><td>Pad Mode</td><td><code>pad_mode</code></td><td>Pitch / Splice / Drone</td><td>Pitch</td></tr>
 <tr><td>Play Gate</td><td><code>play_mode</code></td><td>Classic / Momentary / Trigger Loop</td><td>Momentary</td></tr>
+<tr><td>Filter</td><td><code>filter</code></td><td>-1 to 1</td><td>0</td></tr>
 <tr><td>Release (ms)</td><td><code>release_ms</code></td><td>1 to 2000</td><td>15</td></tr>
 <tr><td>Root Note</td><td><code>root_note</code></td><td>0 to 127</td><td>60</td></tr>
 <tr><td>Octave</td><td><code>octave_transpose</code></td><td>-3 to 3</td><td>0</td></tr>
@@ -668,6 +690,7 @@ footer .word { font: 400 30px/1 var(--mark); color: var(--silk); margin-bottom: 
 <tr><td>After Recording</td><td><code>rec_after</code></td><td>Play / Overdub</td><td>Play</td></tr>
 <tr><td>Overdub Head</td><td><code>rec_head</code></td><td>Steady / Vari-Speed</td><td>Steady</td></tr>
 <tr><td>Trim Key Noise</td><td><code>rec_trim</code></td><td>Off / 50 ms / 100 ms / 200 ms / 300 ms / 500 ms</td><td>Off</td></tr>
+<tr><td>Input Gate</td><td><code>in_gate</code></td><td>Off / -70 dB / -60 dB / -50 dB / -40 dB</td><td>-60 dB</td></tr>
 <tr><td>Record Through FX</td><td><code>fx_rec</code></td><td>Off / On</td><td>Off</td></tr>
 <tr><td>Save at 48 kHz</td><td><code>save_48k</code></td><td>Off / On</td><td>Off</td></tr>
 <tr class="grp"><th colspan="4" scope="rowgroup">Clock</th></tr>
@@ -688,7 +711,7 @@ footer .word { font: 400 30px/1 var(--mark); color: var(--silk); margin-bottom: 
     <div class="sign" aria-hidden="true"><svg class="reel-sign" viewBox="-108 -108 216 216"></svg></div>
     <div>
       <div class="word">HEIMAT</div>
-      <p>Version 0.12.1. Open source under the MIT licence, and it will stay that way: copy it, change it, pass it on. Built on <a href="https://github.com/charlesvestal/schwung">Schwung</a> by Charles Vestal.</p>
+      <p>Version 0.14.0. Open source under the MIT licence, and it will stay that way: copy it, change it, pass it on. Built on <a href="https://github.com/charlesvestal/schwung">Schwung</a> by Charles Vestal.</p>
       <p>An independent project, not made or endorsed by Ableton.</p>
     </div>
     <div>
@@ -938,13 +961,13 @@ const LAB = { gene_size: ["GENE", "Gene-Size"], slide: ["SLDE", "Slide"], morph:
   bend_range: ["BEND", "Bend range"], release_ms: ["REL", "Release"], splice_source: ["SPL", "Splice source"], divide: ["DIV", "Divide into"],
   mcr1: ["CH2", "Chord 2nd"], mcr2: ["CH3", "Chord 3rd"], mcr3: ["CH4", "Chord 4th"], save_48k: ["48K", "Save at 48 kHz"], mute: ["MUTE", "Mute"],
   pattern: ["PATT", "Pattern"], pattern_seed: ["SEED", "Pattern seed"], rec_length: ["LEN", "Record length"], rec_after: ["AFTR", "After recording"],
-  rec_head: ["HEAD", "Overdub head"], rec_trim: ["KEYS", "Trim key noise"],
+  rec_head: ["HEAD", "Overdub head"], rec_trim: ["KEYS", "Trim key noise"], in_gate: ["GATE", "Input gate"], filter: ["FILT", "DJ filter"], mod_restart: ["MRST", "Restart mods on clock"],
   mod_wave_shape: ["SHP", "Wave shape"], mod_wave_rate: ["RATE", "Wave rate"], mod_wave_sync: ["SYNC", "Wave sync"], mod_wave_retrig: ["RST", "Wave restart"],
   mod_rand_rate: ["RATE", "Random rate"], mod_rand_smooth: ["SMTH", "Random smooth"], mod_rand_sync: ["SYNC", "Random sync"], mod_rand_retrig: ["RST", "Random on pads"],
   mod_follow_src: ["SRC", "Follow source"], mod_follow_gain: ["GAIN", "Follow gain"], mod_follow_attack: ["RISE", "Follow rise"], mod_follow_release: ["FALL", "Follow fall"],
   mod_env_attack: ["ATK", "Envelope attack"], mod_env_decay: ["DCY", "Envelope decay"], mod_env_mode: ["MODE", "Envelope mode"], mod_env_trigger: ["TRIG", "Envelope trigger"] };
 const PAGES = [
-  { name: "PLAY", img: "play_reel", how: "Track 1", keys: ["gene_size", "slide", "morph", "vari_speed", "organize", "sos", "volume", "clock_div"],
+  { name: "PLAY", img: "play_reel", how: "Track 1", keys: ["gene_size", "slide", "morph", "vari_speed", "organize", "filter", "volume", "clock_div"],
     text: "The splice window shows the selected splice and its number; the brackets show where the genes read. The two arrows beside the Morph state show the direction. Capture drops a marker at the playhead." },
   { name: "MOD 1", img: "mod1", how: "Shift and Track 1", keys: ["mod_wave_shape", "mod_wave_rate", "mod_wave_sync", "mod_wave_retrig", "mod_rand_rate", "mod_rand_smooth", "mod_rand_sync", "mod_rand_retrig"],
     text: "Wave and Random, each drawn as it moves, with how many controls it drives." },
@@ -954,7 +977,7 @@ const PAGES = [
     text: "The whole reel with its markers and a cursor. Jog moves the cursor and a click drops a marker; Delete removes the marker under the cursor. STRT and END move the markers around the selected splice. DIV divides the reel into equal splices when you stop turning." },
   { name: "REC", img: "rec_ready", how: "Track 3", keys: ["sos", "in_gain", "rec_source", "rec_sync", "clock_source", "bpm", "clock_div", "clock_mode"],
     text: "Input and output levels, the recording state and the clock. With Record Sync on, a recording waits for the next tick before it starts or stops." },
-  { name: "LOOP", img: "loop", how: "Track 3 twice", keys: ["rec_length", "rec_after", "rec_head", "rec_trim", "rec_sync", "sos", "bpm", "vari_speed"],
+  { name: "LOOP", img: "loop", how: "Track 3 twice", keys: ["rec_length", "rec_after", "rec_head", "rec_trim", "rec_sync", "sos", "bpm", "in_gate"],
     text: "The looper side of recording: the length chosen, filling bar by bar while you record, then what follows (play or overdub) and how the overdub head moves." },
   { name: "TRIM", img: "trim", how: "Shift and Capture, or Menu, Trim splice", keys: ["@trim_in", "@trim_out", "@trim_zoom"],
     text: "The selected splice on its own: what will stay drawn solid, what will go dotted, a mark on the point you moved last. Below, how much comes off each end and how much stays. Jog click or Capture cuts, Back cancels." },
@@ -974,7 +997,7 @@ const PAGES = [
     text: "The pre-delay as a stretch of time, forwards or backwards, with Absorb, the speed of the motion and whether recordings take the effects." },
   { name: "SETUP 1", img: "setup_1", how: "Track 4 eight times", keys: ["pad_mode", "play_mode", "root_note", "octave_transpose", "splice_base", "organize_mode", "bend_range", "release_ms"],
     text: "How the pads play and how notes map to speed. Release is the fade when the genes are stopped." },
-  { name: "SETUP 2", img: "setup_2", how: "Track 4 nine times", keys: ["splice_source", "divide", "mcr1", "mcr2", "mcr3", "save_48k", "mute", "volume"],
+  { name: "SETUP 2", img: "setup_2", how: "Track 4 nine times", keys: ["splice_source", "divide", "mcr1", "mcr2", "mcr3", "save_48k", "mute", "mod_restart"],
     text: "Where splices come from, the chord ratios of the fourth Morph stage, and the sample rate for saving." },
 ];
 (function () {

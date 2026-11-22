@@ -174,6 +174,36 @@ static double rms_db(const float *x, int n)
     return 20.0 * log10(sqrt(ss / (n > 0 ? n : 1)) + 1e-12);
 }
 
+/* share of the energy above lo_hz that is not f0 or one of its harmonics, dB
+ * (Hann window, radix-2 FFT; n a power of two) */
+static double hiss_above(const float *x, int n, double f0, double lo_hz)
+{
+    double *re = (double *)calloc((size_t)n, sizeof(double)), *im = (double *)calloc((size_t)n, sizeof(double));
+    for (int i = 0; i < n; i++) re[i] = x[i] * (0.5 - 0.5 * cos(2 * M_PI * i / (n - 1)));
+    for (int i = 1, j = 0; i < n; i++) { int b = n >> 1; for (; j & b; b >>= 1) j ^= b; j ^= b; if (i < j) { double t = re[i]; re[i] = re[j]; re[j] = t; } }
+    for (int len = 2; len <= n; len <<= 1) {
+        const double ang = -2 * M_PI / len, wr = cos(ang), wi = sin(ang);
+        for (int i = 0; i < n; i += len) {
+            double ur = 1, ui = 0;
+            for (int k = 0; k < len / 2; k++) {
+                const int a = i + k, b = a + len / 2;
+                const double xr = re[b] * ur - im[b] * ui, xi = re[b] * ui + im[b] * ur;
+                re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+                const double t = ur * wr - ui * wi; ui = ur * wi + ui * wr; ur = t;
+            }
+        }
+    }
+    double tot = 0, hs = 0;
+    for (int k = 1; k < n / 2; k++) {
+        const double f = (double)k * SR / n, pw = re[k] * re[k] + im[k] * im[k];
+        tot += pw;
+        const double hn = f / f0, dh = fabs(hn - round(hn)) * f0;
+        if (f > lo_hz && dh > 40) hs += pw;
+    }
+    free(re); free(im);
+    return 10.0 * log10(hs / (tot + 1e-30) + 1e-30);
+}
+
 static int autocorr_peak(const float *x, int n, int lag_lo, int lag_hi)
 {
     double e0 = 0;
@@ -1722,7 +1752,7 @@ int main(int argc, char **argv)
         if (f) fclose(f);
         CHECK(listed == 62 && kept == listed, "le %d chiavi della 0.8.0 esistono tutte, stesso tipo, nessuna opzione persa", listed);
         /* the newest list names every key there is */
-        f = fopen("tests/fixtures/params_0.12.0.txt", "r");
+        f = fopen("tests/fixtures/params_0.14.0.txt", "r");
         listed = kept = 0;
         while (f && fgets(line, sizeof line, f)) {
             char key[64], type[16]; int nopt = 0;
@@ -1736,7 +1766,7 @@ int main(int argc, char **argv)
             kept++;
         }
         if (f) fclose(f);
-        CHECK(listed == P_COUNT && kept == listed, "le %d chiavi della 0.12.0 sono tutte quelle che ci sono", listed);
+        CHECK(listed == P_COUNT && kept == listed, "le %d chiavi della 0.14.0 sono tutte quelle che ci sono", listed);
 
         static const char *const files[3] = { "tests/fixtures/state_0.5.0.json", "tests/fixtures/state_0.6.0.json", "tests/fixtures/state_0.7.0.json" };
         char *js = (char *)malloc(HM_STATE_MAX);
@@ -1901,7 +1931,7 @@ int main(int argc, char **argv)
         CHECK(mn < 0.03f && mx > 0.97f && cross >= 3 && cross <= 5 && fabs(atof(b) - 0.5) < 1e-3,
               "Wave 1 Hz su Volume al 50%%: il volume va da %.2f a %.2f (%d passaggi in 2 s), il knob resta a %.2f", mn, mx, cross, atof(b));
         api->get_param(in, "mod_routes", b, sizeof b);
-        CHECK(strcmp(b, "volume:0:0.500") == 0, "mod_routes: \"%s\"", b);
+        CHECK(strcmp(b, "volume:0:0.500:1") == 0, "mod_routes: \"%s\" (Wave: bipolare)", b);
         /* a knob can be turned while modulated: the modulation follows it */
         setf(in, "volume", 0.2); blocks(in, 0.6, NULL);
         CHECK(h->p[P_VOLUME] <= 0.7f + 1e-3f && h->base[P_VOLUME] == 0.2f, "girando il knob la modulazione si sposta con lui");
@@ -2038,6 +2068,133 @@ int main(int argc, char **argv)
         fr = ui_num(in, "fr");
         CHECK(ui_num(in, "rec") == 0 && fabs(fr - SR) < 400, "con Record Sync la durata resta esattamente un tick (%.0f frame)", fr);
         g_in_amp = 0; api->destroy_instance(in);
+    }
+    /* --------------------------------------------------------------- 47 */
+    printf("\n47. Rumore: modulazione del riverbero, Wear nel feedback, Input Gate\n");
+    {
+        /* the effects alone, a 440 Hz sine in: how much comes out that is not 440 Hz and its harmonics */
+        #define FX_RUN(h_, amp_, n_, out_) do { for (int i_ = 0; i_ < (n_); i_++) { \
+            if ((i_ & 127) == 0) { fx_block(h_); heads_block(h_); } \
+            float l_ = (amp_) * sinf(2.0f * (float)M_PI * 440.0f * (float)(fx_n++) / SR), r_ = l_; \
+            fx_frame(h_, &l_, &r_); if (out_) (out_)[i_] = l_; } } while (0)
+        long fx_n = 0;
+        const int NW = 32768;
+        float *w = (float *)malloc(sizeof(float) * (size_t)NW);
+        const char *cases[][7] = {
+            { "Depth +0.6", "rev_depth", "0.6", "rev_speed", "0.35", NULL, NULL },
+            { "Depth +0.6, Speed 0.8", "rev_depth", "0.6", "rev_speed", "0.8", NULL, NULL },
+            { "Depth -0.8, Speed 0.8", "rev_depth", "-0.8", "rev_speed", "0.8", NULL, NULL },
+        };
+        for (int c = 0; c < 3; c++) {
+            void *in = new_inst(); hm_t *h = H(in);
+            setf(in, "rev_mix", 0.5);
+            for (int k = 1; cases[c][k]; k += 2) setf(in, cases[c][k], atof(cases[c][k + 1]));
+            FX_RUN(h, 0.25f, 3 * SR, (float *)NULL);
+            FX_RUN(h, 0.25f, NW, w);
+            const double res = hiss_above(w, NW, 440.0, 4000.0);
+            CHECK(res < -50.0, "%s: sopra i 4 kHz, fuori dalle armoniche, quasi niente (%.1f dB sotto il segnale)", cases[c][0], -res);
+            api->destroy_instance(in);
+        }
+        free(w);
+        /* Warm, Fold, Fuzz never make the loop play by itself */
+        const char *wear[] = { "Warm", "Fold", "Fuzz" };
+        for (int c = 0; c < 3; c++) {
+            void *in = new_inst(); hm_t *h = H(in);
+            setf(in, "hd_mix", 1); setf(in, "hd_fdbk", 0.97); setp(in, "hd_wear", wear[c]); setf(in, "hd_wear_amt", 0.7);
+            float t[4096]; float *tp = t;
+            FX_RUN(h, 0.0f, 8 * SR, (float *)NULL);
+            FX_RUN(h, 0.0f, 4096, tp);
+            CHECK(rms_db(t, 4096) < -150.0, "%s al 70%%, feedback 0.97, nessun ingresso: silenzio (%.0f dBFS)", wear[c], rms_db(t, 4096));
+            FX_RUN(h, 0.3f, SR / 2, (float *)NULL);
+            FX_RUN(h, 0.0f, 20 * SR, (float *)NULL);
+            FX_RUN(h, 0.0f, 4096, tp);
+            CHECK(rms_db(t, 4096) < -40.0, "%s: dopo un suono le ripetizioni si spengono (%.0f dBFS dopo 20 s)", wear[c], rms_db(t, 4096));
+            api->destroy_instance(in);
+        }
+        #undef FX_RUN
+        /* Input Gate: hiss at -66 dBFS is pushed down, a real signal passes untouched */
+        void *in = new_inst(); wait_blank(in);
+        setf(in, "sos", 0); setf(in, "rev_mix", 0.0);
+        rec_t r; double lv[2][2];
+        for (int g = 0; g < 2; g++) {
+            setp(in, "in_gate", g ? "-60 dB" : "Off");
+            g_in_freq = 3000; g_in_amp = 0.0005; blocks(in, 0.5, NULL);
+            rec_init(&r, 0.5); blocks(in, 0.4, &r); lv[g][0] = rms_db(r.L, r.n); rec_free(&r);
+            g_in_amp = 0.1; blocks(in, 0.3, NULL);
+            rec_init(&r, 0.5); blocks(in, 0.4, &r); lv[g][1] = rms_db(r.L, r.n); rec_free(&r);
+        }
+        CHECK(lv[1][0] < lv[0][0] - 30.0, "Input Gate -60 dB: il fruscio a -66 dBFS scende di %.0f dB", lv[0][0] - lv[1][0]);
+        CHECK(fabs(lv[1][1] - lv[0][1]) < 0.05, "un segnale vero passa identico (%.2f dB di differenza)", lv[1][1] - lv[0][1]);
+        g_in_amp = 0; api->destroy_instance(in);
+    }
+    /* --------------------------------------------------------------- 48 */
+    printf("\n48. Gesti di base: polarita', valori vivi, TEMP, filtro DJ, modulatori dal clock\n");
+    {
+        void *in = inst_with("sine16m.wav", 1); hm_t *h = H(in);
+        char b[1024];
+        /* polarity: Wave one way stays above the knob, Envelope both ways goes below */
+        setf(in, "volume", 0.5); setf(in, "mod_wave_rate", log(50.0) / log(1000.0));
+        setp(in, "mod_set", "0 volume 0.4");
+        setp(in, "mod_pol", "0 volume");
+        float mn = 9, mx = -9;
+        for (int k = 0; k < (int)(1.2 * SR / BLK); k++) { blocks(in, (double)BLK / SR, NULL); if (h->p[P_VOLUME] < mn) mn = h->p[P_VOLUME]; if (h->p[P_VOLUME] > mx) mx = h->p[P_VOLUME]; }
+        api->get_param(in, "mod_routes", b, sizeof b);
+        CHECK(strcmp(b, "volume:0:0.400:0") == 0 && mn >= 0.499f && mx > 0.88f, "Wave unipolare: solo sopra il knob (%.2f .. %.2f), \"%s\"", mn, mx, b);
+        setp(in, "mod_clear", "all");
+        setf(in, "mod_env_attack", 0); setf(in, "mod_env_decay", 0.6);
+        setp(in, "mod_set", "3 volume 0.3"); setp(in, "mod_pol", "3 volume");
+        blocks(in, 0.4, NULL);
+        const float idle = h->p[P_VOLUME];
+        CHECK(fabsf(idle - 0.2f) < 0.01f, "Envelope bipolare a riposo: sotto il knob (%.2f)", idle);
+        /* live values */
+        setp(in, "mod_set", "1 scatter 0.5");
+        blocks(in, 0.1, NULL);
+        api->get_param(in, "mod_live", b, sizeof b);
+        CHECK(strstr(b, "volume:0.2") && strstr(b, "scatter:"), "mod_live: dove sono ora i controlli modulati (\"%s\")", b);
+        /* a saved route keeps its polarity; an old one without it takes the source's */
+        setp(in, "state", "{\"mod_routes\":\"width:2:0.400,morph:0:0.300:0\"}");
+        int okp = 0; for (int r = 0; r < h->n_mr; r++) { if (h->mr[r].tgt == P_WIDTH && h->mr[r].bip == 0) okp++; if (h->mr[r].tgt == P_MORPH && h->mr[r].bip == 0) okp++; }
+        CHECK(okp == 2, "percorsi salvati: polarita' letta, o quella della sorgente se manca");
+        setp(in, "mod_clear", "all");
+        /* TEMP */
+        setf(in, "gene_size", 0.3); setf(in, "rev_mix", 0.1); setp(in, "pad_mode", "Pitch");
+        setp(in, "mod_set", "0 slide 0.2");
+        setp(in, "temp", "begin");
+        api->get_param(in, "ui_state", b, sizeof b);
+        const int tmp_on = strstr(b, "\"tmp\":1") != NULL;
+        setf(in, "gene_size", 0.9); setf(in, "rev_mix", 0.8); setp(in, "pad_mode", "Drone"); setp(in, "mod_set", "0 slide 0"); setp(in, "mod_set", "2 morph 0.5");
+        blocks(in, 0.05, NULL);
+        setp(in, "temp", "end"); blocks(in, 0.05, NULL);
+        api->get_param(in, "mod_routes", b, sizeof b);
+        CHECK(tmp_on && fabsf(h->base[P_GENE] - 0.3f) < 1e-6f && fabsf(h->base[P_REV_MIX] - 0.1f) < 1e-6f && (int)h->base[P_PAD_MODE] == 0 && strcmp(b, "slide:0:0.200:1") == 0,
+              "TEMP: al termine tornano knob, scelte e percorsi (\"%s\")", b);
+        setp(in, "temp", "begin"); setf(in, "gene_size", 0.7); setp(in, "temp", "cancel");
+        CHECK(fabsf(h->base[P_GENE] - 0.7f) < 1e-6f, "TEMP annullato: i cambiamenti restano");
+        setp(in, "temp", "end");
+        CHECK(fabsf(h->base[P_GENE] - 0.7f) < 1e-6f, "un end senza begin non fa niente");
+        api->destroy_instance(in);
+
+        /* DJ filter on the input: low-pass to the left cuts 3 kHz, high-pass to the right cuts 100 Hz */
+        in = new_inst(); wait_blank(in);
+        setf(in, "sos", 0);
+        rec_t r; double lv[3][2];
+        const char *fv[3] = { "0", "-0.6", "0.6" };
+        const double fq[2] = { 100, 3000 };
+        for (int m = 0; m < 3; m++) for (int q = 0; q < 2; q++) {
+            setf(in, "filter", atof(fv[m])); g_in_freq = fq[q]; g_in_amp = 0.3; blocks(in, 0.4, NULL);
+            rec_init(&r, 0.4); blocks(in, 0.3, &r); lv[m][q] = rms_db(r.L, r.n); rec_free(&r);
+        }
+        CHECK(lv[1][1] < lv[0][1] - 24 && lv[1][0] > lv[0][0] - 3, "filtro a sinistra: 3 kHz giu' di %.0f dB, 100 Hz quasi intatti (%.1f)", lv[0][1] - lv[1][1], lv[1][0] - lv[0][0]);
+        CHECK(lv[2][0] < lv[0][0] - 20 && lv[2][1] > lv[0][1] - 3, "filtro a destra: 100 Hz giu' di %.0f dB, 3 kHz quasi intatti (%.1f)", lv[0][0] - lv[2][0], lv[2][1] - lv[0][1]);
+        CHECK(fabs(lv[0][0] - lv[0][1]) < 0.5, "al centro non tocca niente");
+        g_in_amp = 0; api->destroy_instance(in);
+
+        /* Restart Mods On Clock */
+        in = new_inst(); h = H(in);
+        setf(in, "mod_wave_rate", 0.3); blocks(in, 0.7, NULL);
+        setp(in, "mod_restart", "On"); setp(in, "clock_source", "Internal"); blocks(in, (double)BLK / SR, NULL);
+        CHECK(h->m_ph[0] < 0.01, "il clock parte: la Wave riparte da capo (fase %.3f)", h->m_ph[0]);
+        api->destroy_instance(in);
     }
     snprintf(cmd, sizeof cmd, "rm -rf %s", g_dir); if (system(cmd)) { }
     printf("\n%s (%d controlli falliti)\n", g_fail ? "ESITO: FALLITO" : "ESITO: TUTTO OK", g_fail);

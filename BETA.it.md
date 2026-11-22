@@ -1,4 +1,4 @@
-# Heimat 0.12.1 — scheda di collaudo della beta
+# Heimat 0.14.0 — scheda di collaudo della beta
 
 Grazie per il collaudo. Heimat ha superato tutti i test offline, ma non ha
 ancora passato ore su una Move vera: questa scheda serve a questo. Ogni sezione
@@ -15,7 +15,7 @@ gli altoparlanti interni il microfono sente gli altoparlanti.
 - [ ] Installa `heimat-solo-module.tar.gz` (Schwung Manager → *Modules* →
       modulo personalizzato, oppure `scripts/install.sh`) e riavvia la Move.
 - [ ] Apri Heimat → **Menu** → **About / DSP load**: deve dire
-      `HEIMAT 0.12.1 BETA`. Tieni a mente questa schermata: serve per le misure
+      `HEIMAT 0.14.0 BETA`. Tieni a mente questa schermata: serve per le misure
       di carico.
 
 **Come leggere About / DSP load.** `DSP` è la parte media di ogni blocco audio
@@ -104,6 +104,21 @@ a cosa stava suonando.
       profondità, Add route e le crocette funzionano nei due sensi con la Move.
 - [ ] Carico (sezione 5) con otto percorsi attivi: `OVER` resta a 0.
 
+## 3c. Suonare tranquilli (0.14)
+
+- [ ] Tieni Undo, gira qualche knob e suona i pad, lascia: torna tutto.
+      Tocca Undo da solo: annulla come prima. Shift + Undo: TMP resta in alto
+      finché non premi di nuovo Undo.
+- [ ] **Da controllare per primo**: Undo, Delete e i Track reagiscono al
+      rilascio (serve per tenerli premuti). Se tenendo Undo non succede
+      niente, segnalalo.
+- [ ] Tieni Delete e gira un knob: torna al valore iniziale, nessun marker
+      cancellato; lo stesso con un tocco.
+- [ ] Tieni Track 1 e tocca senza girare un knob modulato: ONE WAY / BOTH
+      WAYS; la tacca sulla barra si muove di conseguenza.
+- [ ] PLAY knob 6: filtro DJ, morbido da tutti e due i lati, nessun clic
+      passando dal centro.
+
 ## 4. Effetti e HEADS
 
 - [ ] Ogni effetto ha la sua pagina: Track 4 passa per MICRO, MICRO 2, EQ,
@@ -118,6 +133,13 @@ a cosa stava suonando.
       Reverse; Decay in cima tiene per sempre; Absorb da denso a scuro; Depth a
       sinistra (chorus), a destra (stanza che vaga), tutto a destra (shimmer),
       con Speed lento e veloce; Tilt scuro e brillante.
+- [ ] **Rumore** (0.13): Depth del riverbero a destra e a sinistra con Speed
+      lento e veloce, shimmer, testine con Warm / Fold / Fuzz a feedback alto:
+      nessun fruscio o crepitio che non fosse nel suono; senza suonare,
+      silenzio.
+- [ ] **Input Gate** (LOOP, GATE): con SOS sotto 1 e il riverbero acceso, il
+      fruscio del microfono non continua a risuonare tra una frase e l'altra;
+      suonando non si taglia niente. Prova anche -70 e -50 dB.
 - [ ] EQ e riverbero al massimo, Decay infinito, Depth su shimmer, per un
       minuto: forte, magari selvaggio, ma niente che esplode e niente silenzio
       dopo.
@@ -142,7 +164,7 @@ minuto di ogni passo. Annota `DSP`, `PEAK` e `OVER`.
 
 ## 6. Aggiornare da Heimat Solo
 
-- [ ] Installa la 0.12.1 sopra Heimat Solo: nel menu dei moduli di Schwung ora
+- [ ] Installa la 0.14.0 sopra Heimat Solo: nel menu dei moduli di Schwung ora
       c'è **Heimat**, una volta sola, e Heimat Solo non c'è più.
 - [ ] Aprilo: ritrovi le impostazioni e l'ultima bobina di prima
       dell'aggiornamento; le bobine salvate sono ancora in `Samples/Heimat`.

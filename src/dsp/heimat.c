@@ -119,6 +119,8 @@ enum {
     P_M3_SRC, P_M3_GAIN, P_M3_ATK, P_M3_REL,
     P_M4_ATK, P_M4_DCY, P_M4_MODE, P_M4_TRIG,
     P_REC_TRIM,
+    P_IN_GATE,
+    P_FILTER, P_MOD_RESTART,
     P_COUNT
 };
 
@@ -165,6 +167,7 @@ static const char *const OPT_FSRC[]   = { "Input", "Output" };
 static const char *const OPT_EMODE[]  = { "AD", "Hold", "Loop" };
 static const char *const OPT_ETRIG[]  = { "Pads", "Clock", "Pads + Clock" };
 static const char *const OPT_RTRIM[]  = { "Off", "50 ms", "100 ms", "200 ms", "300 ms", "500 ms" };
+static const char *const OPT_GATE[]   = { "Off", "-70 dB", "-60 dB", "-50 dB", "-40 dB" };
 
 #define PF(k, n, s, mn, mx, d, st) { k, n, s, T_FLOAT, mn, mx, d, st, NULL, 0 }
 #define PI(k, n, s, mn, mx, d)     { k, n, s, T_INT, (float)(mn), (float)(mx), (float)(d), 1.0f, NULL, 0 }
@@ -255,7 +258,12 @@ static const pdef_t g_params[P_COUNT] = {
     [P_M4_MODE]   = PE("mod_env_mode",     "Envelope Mode",      "EMode", OPT_EMODE, 3, 0),
     [P_M4_TRIG]   = PE("mod_env_trigger",  "Envelope Trigger",   "ETrig", OPT_ETRIG, 3, 0),
     [P_REC_TRIM]  = PE("rec_trim",         "Trim Key Noise",     "KeyTrm", OPT_RTRIM, 6, 0),
+    [P_IN_GATE]   = PE("in_gate",          "Input Gate",         "Gate",  OPT_GATE, 5, 2),
+    [P_FILTER]    = PF("filter",           "Filter",             "Filt",  -1.0f, 1.0f, 0.0f, 0.005f),
+    [P_MOD_RESTART]= PE("mod_restart",     "Restart Mods On Clock", "MRst", OPT_ONOFF, 2, 0),
 };
+
+static const float k_gate_db[5] = { 0.0f, -70.0f, -60.0f, -50.0f, -40.0f };
 
 static const float k_rec_trim_ms[6] = { 0.0f, 50.0f, 100.0f, 200.0f, 300.0f, 500.0f };
 
@@ -285,7 +293,7 @@ typedef struct {
     uint8_t shape;             /* envelope shape at birth                       */
 } gene_t;
 
-typedef struct { uint32_t mk[HM_MAX_MARKERS]; int n; uint32_t frames; struct reel_s *reel; int ssrc; } undo_t;   /* reel: the reel before a trim */   /* reel: the reel before a trim */
+typedef struct { uint32_t mk[HM_MAX_MARKERS]; int n; uint32_t frames; struct reel_s *reel; int ssrc; } undo_t;   /* reel: the reel before a trim */
 
 /* ------------------------------------------------------- internal effects */
 
@@ -318,7 +326,9 @@ typedef struct {
     float scale, scale_tgt;                /* Size as a length factor           */
     float diff_g, damp_a;
     float lfo_ph, lfo_inc;                 /* cyclic modulation                  */
-    float erg[RV_N], erg_tgt[RV_N], erg_cnt[RV_N], erg_c;  /* ergodic modulation  */
+    float erg[RV_N], erg_tgt[RV_N], erg_from[RV_N], erg_t[RV_N], erg_inc[RV_N];  /* ergodic: smooth random segments */
+    float cyc_amp;                         /* cyclic: excursion allowed at this rate */
+    float sh_lp[2], sh_hp;                 /* shimmer: band-limit what goes back in */
     uint32_t rng;
     float sh[RV_SH_LEN];
     uint32_t shw;
@@ -417,12 +427,18 @@ typedef struct {
     int m_trig;                            /* pad pressed / clock tick since the last block (bits) */
     uint32_t m_rng;
     float blk_in_pk, blk_out_pk;           /* last block's peaks, for Follow */
-    struct { int16_t tgt; int8_t src; float amt; } mr[HM_MAX_ROUTES];
+    struct { int16_t tgt; int8_t src; int8_t bip; float amt; } mr[HM_MAX_ROUTES];   /* bip: the source swings both ways */
+    float temp_base[P_COUNT];              /* TEMP: everything as it was when it began */
+    struct { int16_t tgt; int8_t src; int8_t bip; float amt; } temp_mr[HM_MAX_ROUTES];
+    int temp_on, temp_n_mr;
+    float dj_s, dj_a1, dj_a2, dj_a3, dj_k, dj_ic[2][2]; int dj_mode;   /* the DJ filter */
+    int clk_was;
     int n_mr;
     uint32_t mr_ver;
     uint32_t rec_target;                   /* Record Length in frames, 0 = free */
     uint32_t rec_skip, rec_cut;            /* Trim Key Noise: frames not written at the start / taken back at the end */
     uint32_t rec_t;                        /* frames since recording started */
+    float gate_env, gate_g; int gate_hold;  /* Input Gate: level, gain, hold */
     struct { uint32_t idx, t; float l, r; } *ring;   /* what each overdub write replaced */
     uint32_t ring_n;
     /* trimming a splice: preview, then a job for the worker that builds the trimmed reel */
@@ -1752,7 +1768,7 @@ static void build_state_json(const hm_t *h, char *buf, int len)
     jb_add(&j, "{\"sample_path\":\"%s\",\"state_format\":%d", esc, HM_STATE_FORMAT);
     for (int i = 0; i < P_COUNT; i++) jb_add(&j, ",\"%s\":%.4f", g_params[i].key, h->base[i]);
     jb_add(&j, ",\"mod_routes\":\"");
-    for (int r = 0; r < h->n_mr; r++) jb_add(&j, "%s%s:%d:%.3f", r ? "," : "", g_params[h->mr[r].tgt].key, h->mr[r].src, (double)h->mr[r].amt);
+    for (int r = 0; r < h->n_mr; r++) jb_add(&j, "%s%s:%d:%.3f:%d", r ? "," : "", g_params[h->mr[r].tgt].key, h->mr[r].src, (double)h->mr[r].amt, h->mr[r].bip);
     jb_add(&j, "\"");
     jb_add(&j, "}");
 }
@@ -1778,8 +1794,10 @@ static void mod_routes_changed(hm_t *h)
     atomic_fetch_add_explicit(&h->state_gen, 1, memory_order_relaxed);
 }
 
-/* amount 0 (or nearly) removes the route */
-static void mod_route_set(hm_t *h, int src, int tgt, float amt)
+static int mod_default_bip(int src) { return src < 2; }   /* Wave and Random swing both ways, Follow and Envelope push one way */
+
+/* amount 0 (or nearly) removes the route; bip -1 keeps the route's polarity (or the source's own for a new one) */
+static void mod_route_set_p(hm_t *h, int src, int tgt, float amt, int bip)
 {
     if (src < 0 || src >= HM_MODS || !mod_target_ok(tgt)) return;
     amt = clampf(amt, -1.0f, 1.0f);
@@ -1790,13 +1808,16 @@ static void mod_route_set(hm_t *h, int src, int tgt, float amt)
         h->p[tgt] = h->base[tgt];
     } else if (r >= 0) {
         h->mr[r].amt = amt;
+        if (bip >= 0) h->mr[r].bip = (int8_t)(bip != 0);
     } else {
         if (h->n_mr >= HM_MAX_ROUTES) return;
         h->mr[h->n_mr].src = (int8_t)src; h->mr[h->n_mr].tgt = (int16_t)tgt; h->mr[h->n_mr].amt = amt;
+        h->mr[h->n_mr].bip = (int8_t)(bip >= 0 ? bip != 0 : mod_default_bip(src));
         h->n_mr++;
     }
     mod_routes_changed(h);
 }
+static void mod_route_set(hm_t *h, int src, int tgt, float amt) { mod_route_set_p(h, src, tgt, amt, -1); }
 
 /* which = -1 all, 0..3 one source, or 100 + parameter index for one control */
 static void mod_routes_clear(hm_t *h, int which)
@@ -1810,13 +1831,15 @@ static void mod_routes_clear(hm_t *h, int which)
     if (j != h->n_mr) { h->n_mr = j; mod_routes_changed(h); }
 }
 
-/* "key:src:amount,key:src:amount" */
+/* "key:src:amount[:polarity],..." (polarity 1 = both ways, 0 = one way; without it, the source's own) */
 static void mod_routes_parse(hm_t *h, const char *s)
 {
     mod_routes_clear(h, -1);
     while (s && *s) {
-        char key[64]; int src; float amt; int n = 0;
-        if (sscanf(s, "%63[^:]:%d:%f%n", key, &src, &amt, &n) == 3) mod_route_set(h, src, param_index(key), amt);
+        char key[64]; int src, bip = -1; float amt; int n = 0;
+        const int got = sscanf(s, "%63[^:]:%d:%f:%d", key, &src, &amt, &bip);
+        (void)n;
+        if (got >= 3) mod_route_set_p(h, src, param_index(key), amt, got == 4 ? bip : -1);
         s = strchr(s, ',');
         if (s) s++;
     }
@@ -1849,6 +1872,8 @@ static void mods_block(hm_t *h, int frames)
     const int trig = h->m_trig;
     h->m_trig = 0;
 
+    /* the clock starts: every modulator from the top, so a phrase lines up with the bar */
+    if (trig & 4) { h->m_ph[0] = 0.0; h->m_ph[1] = 1.0; }
     /* Wave */
     if ((trig & 1) && P[P_M1_RETRIG] > 0.5f) h->m_ph[0] = 0.0;
     h->m_ph[0] += (double)(mod_rate_hz(h, P_M1_RATE, P_M1_SYNC) * dt);
@@ -1910,7 +1935,12 @@ static void mods_block(hm_t *h, int frames)
     for (int r = 0; r < h->n_mr; r++) {
         const int t = h->mr[r].tgt;
         const pdef_t *d = &g_params[t];
-        h->p[t] += h->mr[r].amt * h->mod[h->mr[r].src] * (d->max - d->min);
+        const int sx = h->mr[r].src;
+        float m = h->mod[sx];
+        const int native = mod_default_bip(sx);
+        if (h->mr[r].bip && !native) m = 2.0f * m - 1.0f;          /* Follow / Envelope made to swing */
+        else if (!h->mr[r].bip && native) m = 0.5f * (m + 1.0f);   /* Wave / Random made to push one way */
+        h->p[t] += h->mr[r].amt * m * (d->max - d->min);
     }
     for (int r = 0; r < h->n_mr; r++) {
         const int t = h->mr[r].tgt;
@@ -1992,6 +2022,7 @@ static void fx_init(hm_t *h)
     const float k = h->sr / 44100.0f;
     for (int i = 0; i < RV_N; i++) f->base[i] = k_lines[i] * k;
     for (int i = 0; i < RV_AP_N; i++) f->ap_base[i] = k_ap[i] * k;
+    for (int i = 0; i < RV_N; i++) f->erg_t[i] = 1.0f;
     f->eq_cur[0] = f->eq_cur[1] = f->eq_cur[3] = 0.0f;
     f->eq_cur[2] = 1000.0f;
     f->scale = f->scale_tgt = 1.0f;
@@ -2057,6 +2088,7 @@ static void fx_block(hm_t *h)
         memset(f->line, 0, sizeof f->line);
         memset(f->sh, 0, sizeof f->sh);
         memset(f->rlp, 0, sizeof f->rlp);
+        memset(f->sh_lp, 0, sizeof f->sh_lp); f->sh_hp = 0.0f;
         memset(f->tb, 0, sizeof f->tb);
         f->tilt_cur = 0.0f; f->tilt_on = 0;
         f->rmix = 0.0f;
@@ -2081,7 +2113,10 @@ static void fx_block(hm_t *h)
     /* inner modulation */
     const float rate = rev_rate(P[P_REV_SPEED]);
     f->lfo_inc = rate / sr;
-    f->erg_c = 1.0f - expf(-2.0f * (float)M_PI * rate * 2.0f / sr);
+    /* how far a length may swing at this rate: the pitch never bends by more
+       than about 1% (Depth at the left) or 0.8% (to the right), so fast
+       modulation gets shallow instead of turning into noise */
+    f->cyc_amp = 0.01f * sr / (2.0f * (float)M_PI * rate);
     /* Tilt: low end up and highs a little down to the left, the other way to the right */
     const float t = clampf(P[P_REV_TILT], -1.0f, 1.0f);
     if (t != f->tilt_cur) {
@@ -2110,6 +2145,18 @@ static inline float rv_read(const float *buf, uint32_t mask, uint32_t w, float d
     const uint32_t i0 = (uint32_t)(int32_t)fl & mask;
     const float a = buf[i0], b = buf[(i0 + 1) & mask];
     return a + (b - a) * fr;
+}
+
+/* 4-point cubic (Hermite): for lengths that move, where straight-line
+ * interpolation would dull the highs a little more on every swing */
+static inline float rv_read_h(const float *buf, uint32_t mask, uint32_t w, float d)
+{
+    const float rp = (float)w - d;
+    const float fl = floorf(rp), t = rp - fl;
+    const uint32_t i1 = (uint32_t)(int32_t)fl & mask;
+    const float y0 = buf[(i1 - 1) & mask], y1 = buf[i1], y2 = buf[(i1 + 1) & mask], y3 = buf[(i1 + 2) & mask];
+    const float c1 = 0.5f * (y2 - y0), c2 = y0 - 2.5f * y1 + 2.0f * y2 - 0.5f * y3, c3 = 0.5f * (y3 - y0) + 1.5f * (y1 - y2);
+    return ((c3 * t + c2) * t + c1) * t + y1;
 }
 
 static inline void heads_frame(hm_t *h, float *pl, float *pr);
@@ -2144,7 +2191,7 @@ static inline void reverb_frame(hm_t *h, float *pl, float *pr)
         for (int k = 0; k < 2; k++) {
             float p = f->pre_ph + 0.5f * (float)k; if (p >= 1.0f) p -= 1.0f;
             const float wv = sinf((float)M_PI * p);
-            x += wv * wv * rv_read(f->pre, RV_PRE_LEN - 1, pw, 2.0f * p * D + 1.0f);
+            x += wv * wv * rv_read_h(f->pre, RV_PRE_LEN - 1, pw, 2.0f * p * D + 2.0f);
         }
     } else x = rv_read(f->pre, RV_PRE_LEN - 1, pw, fmaxf(f->pre_t, 1.0f));
 
@@ -2156,9 +2203,14 @@ static inline void reverb_frame(hm_t *h, float *pl, float *pr)
         for (int k = 0; k < 2; k++) {
             float p = f->sh_ph + 0.5f * (float)k; if (p >= 1.0f) p -= 1.0f;
             const float wv = sinf((float)M_PI * p);
-            y += wv * wv * rv_read(f->sh, RV_SH_LEN - 1, f->shw, RV_SH_WIN * (1.0f - p) + 2.0f);
+            y += wv * wv * rv_read_h(f->sh, RV_SH_LEN - 1, f->shw, RV_SH_WIN * (1.0f - p) + 3.0f);
         }
-        x += 0.55f * (dep - 0.85f) / 0.15f * y;
+        /* only the band that sings goes back in: no rumble, and no hiss raised
+           an octave on every pass */
+        f->sh_lp[0] += (y - f->sh_lp[0]) * 0.45f;                     /* about 4.5 kHz, two poles */
+        f->sh_lp[1] += (f->sh_lp[0] - f->sh_lp[1]) * 0.45f;
+        f->sh_hp += (f->sh_lp[1] - f->sh_hp) * 0.017f;                 /* about 120 Hz */
+        x += 0.55f * (dep - 0.85f) / 0.15f * (f->sh_lp[1] - f->sh_hp);
     }
 
     /* diffusion */
@@ -2187,18 +2239,27 @@ static inline void reverb_frame(hm_t *h, float *pl, float *pr)
     for (int i = 0; i < RV_N; i++) {
         const float L = f->base[i] * f->scale;
         float md = 0.0f;
-        if (cyc > 0.0f) md = cyc * fminf(0.06f * L, 400.0f) * (sn * k_c[i] + cs * k_s[i]);
-        if (erg > 0.0f || f->erg[i] != 0.0f) {
-            if ((f->erg_cnt[i] -= 1.0f) <= 0.0f) {
-                f->erg_tgt[i] = erg * 0.45f * L * (2.0f * fx_randu(f) - 1.0f);
-                f->erg_cnt[i] = sr / (f->lfo_inc * sr + 1e-3f) * (0.5f + fx_randu(f));
+        if (cyc > 0.0f) md = cyc * fminf(fminf(0.06f * L, 400.0f), f->cyc_amp) * (sn * k_c[i] + cs * k_s[i]);
+        if (erg > 0.0f || f->erg[i] != 0.0f || f->erg_t[i] < 1.0f) {
+            /* each line glides to a new random length along a half cosine, so
+               the pitch bends smoothly and never jumps */
+            if (f->erg_t[i] >= 1.0f) {
+                const float dur = sr / (f->lfo_inc * sr + 1e-3f) * (0.5f + fx_randu(f));
+                const float amax = erg * fminf(0.45f * L, 0.008f * dur / (float)M_PI);
+                f->erg_from[i] = f->erg[i];
+                f->erg_tgt[i] = amax * (2.0f * fx_randu(f) - 1.0f);
+                if (erg == 0.0f) f->erg_tgt[i] = 0.0f;
+                f->erg_t[i] = 0.0f;
+                f->erg_inc[i] = 1.0f / fmaxf(dur, 1.0f);
             }
-            f->erg[i] += (f->erg_tgt[i] - f->erg[i]) * f->erg_c;
-            if (erg == 0.0f && fabsf(f->erg[i]) < 1e-3f) f->erg[i] = 0.0f;
+            f->erg_t[i] = fminf(1.0f, f->erg_t[i] + f->erg_inc[i]);
+            const float u = 0.5f - 0.5f * cosf((float)M_PI * f->erg_t[i]);
+            f->erg[i] = f->erg_from[i] + (f->erg_tgt[i] - f->erg_from[i]) * u;
+            if (erg == 0.0f && f->erg_t[i] >= 1.0f) f->erg[i] = 0.0f;
             md += f->erg[i];
         }
-        const float dl = clampf(L + md, 2.0f, (float)(RV_LEN - 4));
-        const float y = rv_read(f->line[i], RV_LEN - 1, rw, dl);
+        const float dl = clampf(L + md, 3.0f, (float)(RV_LEN - 4));
+        const float y = md != 0.0f ? rv_read_h(f->line[i], RV_LEN - 1, rw, dl) : rv_read(f->line[i], RV_LEN - 1, rw, dl);
         f->rlp[i] += (y - f->rlp[i]) * f->damp_a;
         o[i] = f->rlp[i];
     }
@@ -2284,7 +2345,9 @@ static inline float hd_read(const hd_line_t *L, double d)
     return a + (b - a) * fr;
 }
 
-/* what one pass through the feedback does to the sound */
+/* what one pass through the feedback does to the sound. None of them is
+ * louder than what comes in at low level (gain 1 near silence): otherwise the
+ * loop would lift its own noise, and with enough Feedback play by itself */
 static inline float hd_wear(hd_line_t *L, int kind, float d, float a, float x)
 {
     if (d < 1e-4f) return x;
@@ -2306,14 +2369,16 @@ static inline float hd_wear(hd_line_t *L, int kind, float d, float a, float x)
     }
     case 3: {                                                        /* Warm: soft saturation */
         const float g = 1.0f + 5.0f * d;
-        return x + fminf(1.0f, 3.0f * d) * (soft_clip(g * x) / sqrtf(g) - x);
+        return x + fminf(1.0f, 3.0f * d) * (soft_clip(g * x) / g - x);
     }
     case 4: {                                                        /* Fold: wavefolder */
-        const float e = sinf(1.5707963f * (1.0f + 6.0f * d) * x);
+        const float k = 1.5707963f * (1.0f + 6.0f * d);
+        const float e = sinf(k * x) / k;
         return x + fminf(1.0f, 3.0f * d) * (e - x);
     }
     default: {                                                       /* Fuzz: hard, a little lopsided */
-        const float e = clampf((1.0f + 30.0f * d) * x + 0.12f * d, -0.7f, 0.7f);
+        const float k = 1.0f + 30.0f * d;
+        const float e = (clampf(k * x + 0.12f * d, -0.7f, 0.7f) - clampf(0.12f * d, -0.7f, 0.7f)) / k;
         return x + fminf(1.0f, 3.0f * d) * (e - x);
     }
     }
@@ -2445,6 +2510,44 @@ static inline void heads_frame(hm_t *h, float *pl, float *pr)
     *pr = in[1] * dry + wet[1] * wg;
 }
 
+/* The DJ filter, last before the output: one knob, low-pass to the left,
+ * high-pass to the right, nothing in the middle. A state-variable filter with a
+ * touch of resonance that grows as it closes. */
+static void dj_block(hm_t *h, int frames)
+{
+    const float target = h->p[P_FILTER];
+    const float c = 1.0f - expf(-(float)frames / (0.015f * h->sr));
+    h->dj_s += (target - h->dj_s) * c;
+    const float x = h->dj_s, ax = fabsf(x);
+    if (ax < 0.004f) {
+        if (h->dj_mode) { h->dj_mode = 0; memset(h->dj_ic, 0, sizeof h->dj_ic); }
+        return;
+    }
+    const int mode = x < 0.0f ? 1 : 2;
+    if (mode != h->dj_mode) { memset(h->dj_ic, 0, sizeof h->dj_ic); h->dj_mode = mode; }
+    /* low-pass: 20 kHz down to 40 Hz; high-pass: 20 Hz up to 10 kHz (both as a curve, most of the knob in the middle range) */
+    float fc = mode == 1 ? 20000.0f * powf(2.0f, -9.0f * ax) : 20.0f * powf(2.0f, 9.0f * ax);
+    fc = clampf(fc, 20.0f, 0.45f * h->sr);
+    const float g = tanf((float)M_PI * fc / h->sr), q = 0.707f + 0.9f * ax;
+    h->dj_k = 1.0f / q;
+    h->dj_a1 = 1.0f / (1.0f + g * (g + h->dj_k));
+    h->dj_a2 = g * h->dj_a1;
+    h->dj_a3 = g * h->dj_a2;
+}
+
+static inline void dj_frame(hm_t *h, float *pl, float *pr)
+{
+    float *io[2] = { pl, pr };
+    for (int c = 0; c < 2; c++) {
+        float *ic = h->dj_ic[c];
+        const float x = *io[c], v3 = x - ic[1];
+        const float v1 = h->dj_a1 * ic[0] + h->dj_a2 * v3;
+        const float v2 = ic[1] + h->dj_a2 * ic[0] + h->dj_a3 * v3;
+        ic[0] = 2.0f * v1 - ic[0]; ic[1] = 2.0f * v2 - ic[1];
+        *io[c] = h->dj_mode == 1 ? v2 : x - h->dj_k * v1 - v2;
+    }
+}
+
 static void hm_render(hm_t *h, int16_t *out, int frames)
 {
     const float sr = h->sr;
@@ -2562,7 +2665,10 @@ static void hm_render(hm_t *h, int16_t *out, int frames)
         h->since_tick += frames;
         for (int i = 0; i < ticks; i++) clock_tick(h);
     }
+    if (h->clk_running && !h->clk_was && h->p[P_MOD_RESTART] > 0.5f) h->m_trig |= 4;
+    h->clk_was = h->clk_running;
     mods_block(h, frames);
+    dj_block(h, frames);
 
     const int16_t *in16 = (g_host && g_host->mapped_memory)
                               ? (const int16_t *)(g_host->mapped_memory + g_host->audio_in_offset) : NULL;
@@ -2616,6 +2722,12 @@ static void hm_render(hm_t *h, int16_t *out, int frames)
     const float master = P[P_MUTE] > 0.5f ? 0.0f : P[P_VOLUME];
     const float sos = P[P_SOS];
     const float ing = k_in_gain[clampi((int)P[P_IN_GAIN], 0, 3)];
+    /* Input Gate: below the threshold the input fades, reaching -40 dB 6 dB
+       under it, after a short hold, so the hiss of the microphone or of a quiet line does not
+       ring on in the reverb and the heads; it opens again in half a millisecond */
+    const int gate_i = clampi((int)P[P_IN_GATE], 0, 4);
+    const float gate_thr = gate_i ? powf(10.0f, k_gate_db[gate_i] / 20.0f) : 0.0f;
+    const float gate_rel = expf(-1.0f / (0.05f * sr)), gate_up = 1.0f - expf(-1.0f / (0.0005f * sr)), gate_dn = 1.0f - expf(-1.0f / (0.12f * sr));
     const int rec_input_only = (int)P[P_REC_SRC] == 1;
     float in_pk = 0.0f, out_pk = 0.0f;
     uint32_t rec_w0 = h->rec_pos;
@@ -2691,10 +2803,20 @@ static void hm_render(hm_t *h, int16_t *out, int frames)
             ir = (float)in16[2 * n + 1] * (1.0f / 32768.0f) * ing;
             float a = fabsf(il) > fabsf(ir) ? fabsf(il) : fabsf(ir);
             if (a > in_pk) in_pk = a;
+            if (gate_i) {
+                h->gate_env = a > h->gate_env ? a : h->gate_env * gate_rel;
+                float tg;
+                if (h->gate_env >= gate_thr) { tg = 1.0f; h->gate_hold = (int)(0.06f * sr); }
+                else if (h->gate_hold > 0) { tg = 1.0f; h->gate_hold--; }
+                else { const float q = clampf((h->gate_env / gate_thr - 0.5f) * 2.0f, 0.0f, 1.0f); tg = 0.01f + 0.99f * q * q; }   /* 6 dB below: -40 dB */
+                h->gate_g += (tg - h->gate_g) * (tg > h->gate_g ? gate_up : gate_dn);
+                il *= h->gate_g; ir *= h->gate_g;
+            }
         }
         const float ml = il * (1.0f - sos) + pl * sos, mr = ir * (1.0f - sos) + pr_ * sos;
         float xl = ml, xr = mr;
         fx_frame(h, &xl, &xr);
+        if (h->dj_mode) dj_frame(h, &xl, &xr);
 
         if (h->rec_mode && reel) {
             float wl = rec_input_only ? il : (fx_rec ? xl : ml), wr = rec_input_only ? ir : (fx_rec ? xr : mr);
@@ -2776,7 +2898,8 @@ static void *v2_create_instance(const char *module_dir, const char *json_default
     if (!h) return NULL;
     h->sr = (g_host && g_host->sample_rate > 0) ? (float)g_host->sample_rate : 44100.0f;
     h->rng = 0x2545F491u;
-    h->ring = calloc(HM_RING, sizeof *h->ring);              /* without it, overdubs just keep their last frames */
+    h->ring = calloc(HM_RING, sizeof *h->ring);
+    h->gate_g = 1.0f;              /* without it, overdubs just keep their last frames */
     h->sel_override = -1;
     h->view_b = 0;
     for (int i = 0; i < P_COUNT; i++) h->p[i] = h->base[i] = g_params[i].def;
@@ -2940,6 +3063,36 @@ static void v2_set_param(void *instance, const char *key, const char *val)
         if (sscanf(val, "%d %63s %f", &src, k, &amt) == 3) mod_route_set(h, src, param_index(k), amt);
         return;
     }
+    if (strcmp(key, "mod_pol") == 0) {                                      /* "source key": both ways <-> one way */
+        int src; char k[64];
+        if (sscanf(val, "%d %63s", &src, k) == 2) {
+            const int r = mod_route_find(h, src, param_index(k));
+            if (r >= 0) { h->mr[r].bip = (int8_t)!h->mr[r].bip; mod_routes_changed(h); }
+        }
+        return;
+    }
+    if (strcmp(key, "temp") == 0) {                     /* "begin", "end" (put everything back), "cancel" (keep it) */
+        if (strcmp(val, "begin") == 0) {
+            memcpy(h->temp_base, h->base, sizeof h->base);
+            memcpy(h->temp_mr, h->mr, sizeof h->mr);
+            h->temp_n_mr = h->n_mr;
+            h->temp_on = 1;
+        } else if (strcmp(val, "end") == 0 && h->temp_on) {
+            h->temp_on = 0;
+            for (int i = 0; i < P_COUNT; i++) if (h->base[i] != h->temp_base[i]) set_param_value(h, i, h->temp_base[i]);
+            int same = h->n_mr == h->temp_n_mr && memcmp(h->mr, h->temp_mr, sizeof(h->mr[0]) * (size_t)h->n_mr) == 0;
+            if (!same) {
+                for (int r = 0; r < h->n_mr; r++) h->p[h->mr[r].tgt] = h->base[h->mr[r].tgt];
+                memcpy(h->mr, h->temp_mr, sizeof h->mr);
+                h->n_mr = h->temp_n_mr;
+                mod_routes_changed(h);
+            }
+            atomic_fetch_add_explicit(&h->state_gen, 1, memory_order_relaxed);
+        } else if (strcmp(val, "cancel") == 0) {
+            h->temp_on = 0;
+        }
+        return;
+    }
     if (strcmp(key, "mod_clear") == 0) {                                    /* "all", a source 0-3, or a key */
         if (strcmp(val, "all") == 0) mod_routes_clear(h, -1);
         else if (val[0] >= '0' && val[0] <= '9') mod_routes_clear(h, atoi(val));
@@ -2984,6 +3137,7 @@ static int get_ui_state(hm_t *h, char *buf, int buf_len)
         const int pl = k_pattern_len[clampi((int)h->p[P_PATTERN], 0, 9)];
         jb_add(&j, ",\"rtg\":%u,\"rdn\":%u,\"pi\":%u", h->rec_mode == REC_NEW ? h->rec_target : 0u,
                h->rec_mode == REC_NEW ? h->rec_pos - h->rec_start : 0u, pl ? h->pat_i % (uint32_t)pl : 0u);
+        jb_add(&j, ",\"tmp\":%d", h->temp_on);
         jb_add(&j, ",\"ton\":%d,\"ta\":%u,\"tb\":%u,\"tjb\":%d", h->trim_on, h->trim_a, h->trim_b, atomic_load(&h->tj_state) != 0);
         jb_add(&j, ",\"mrv\":%u,\"mo\":[%.3f,%.3f,%.3f,%.3f]", h->mr_ver,
                (double)h->mod[0], (double)h->mod[1], (double)h->mod[2], (double)h->mod[3]);
@@ -3132,7 +3286,20 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
     if (strcmp(key, "mod_routes") == 0) {
         jb_t j = { buf, buf_len, 0, 0 };
         buf[0] = 0;
-        for (int r = 0; r < h->n_mr; r++) jb_add(&j, "%s%s:%d:%.3f", r ? "," : "", g_params[h->mr[r].tgt].key, h->mr[r].src, (double)h->mr[r].amt);
+        for (int r = 0; r < h->n_mr; r++) jb_add(&j, "%s%s:%d:%.3f:%d", r ? "," : "", g_params[h->mr[r].tgt].key, h->mr[r].src, (double)h->mr[r].amt, h->mr[r].bip);
+        return j.ovf ? -1 : j.len;
+    }
+    if (strcmp(key, "mod_live") == 0) {                 /* where each modulated control is right now: "key:value,..." */
+        jb_t j = { buf, buf_len, 0, 0 };
+        buf[0] = 0;
+        int done[P_COUNT] = { 0 }, first = 1;
+        for (int r = 0; r < h->n_mr; r++) {
+            const int t = h->mr[r].tgt;
+            if (done[t]) continue;
+            done[t] = 1;
+            jb_add(&j, "%s%s:%.4f", first ? "" : ",", g_params[t].key, (double)h->p[t]);
+            first = 0;
+        }
         return j.ovf ? -1 : j.len;
     }
     if (strcmp(key, "sample_path") == 0)  return snprintf(buf, (size_t)buf_len, "%s", h->cur_path);

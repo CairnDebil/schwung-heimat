@@ -5,6 +5,75 @@ version (1.1, 1.2) adds features without breaking saved sessions or patches,
 and a patch version (1.0.1) only fixes things. Before 1.0 every version is a
 development or beta release.
 
+## [0.14.0] — playing safely
+
+The first of the steps planned after studying how a performance sampler
+keeps the hands on the music: get back from any experiment, see what the
+modulation is doing, and reach the most used control at once.
+
+### Added
+- **TEMP**: hold Undo and change anything (knobs, choices, pads, routes); let
+  go and everything is back where it was. Shift + Undo keeps it on until
+  Undo again (TMP in the header). A plain tap of Undo still undoes. Engine:
+  `temp` = `begin` / `end` / `cancel`, `ui_state` carries `tmp`.
+- **Back to the start value**: hold Delete and turn or touch a knob. Delete
+  then neither deletes a marker nor clears them when let go.
+- **Polarity of each route**: both ways around the knob, or one way only.
+  On the Move hold the Track button and touch the knob without turning it; in
+  the editor the ± / + button on each route. Wave and Random start both ways,
+  Follow and Envelope one way (as before). Engine: `mod_pol` ("source key");
+  routes are saved as `key:source:amount:polarity`, older ones without the
+  fourth field take the source's.
+- **Live value on modulated cells**: a tick on the bar where the modulation
+  has taken the control right now. Engine: `mod_live` ("key:value,...").
+- **DJ filter** (`filter`, PLAY knob 6, editor Play panel): low-pass to the
+  left (20 kHz to 40 Hz), high-pass to the right (20 Hz to 10 kHz), nothing in
+  the middle, last before the output.
+- **Restart Mods On Clock** (`mod_restart`, SETUP 2 knob 8, editor
+  Modulators panel): when the clock starts, Wave and Random start from the
+  top.
+
+### Changed
+- PLAY page: knob 6 is the DJ filter; Sound on Sound stays on REC and LOOP.
+- SETUP 2: knob 8 is Restart Mods On Clock (Volume stays on PLAY).
+- Undo acts when released, so that holding it can start TEMP.
+- Parameter keys frozen again in `tests/fixtures/params_0.14.0.txt`.
+
+## [0.13.0] — quieter effects
+
+Measured with a 440 Hz sine through each effect: the energy that is neither
+the note nor its harmonics.
+
+### Fixed
+- **Reverb modulation noise.** To the right of Depth each line jumped to a new
+  random length and slid there with a one-pole, so the pitch bent with a kink
+  at every step; at high Speed the lengths moved by many samples per sample
+  and the tail turned into noise (as loud as the note at Depth 0.6, Speed
+  0.8). Now each line glides along a half cosine, and how far it may swing
+  depends on the rate, so the pitch never bends by more than about 0.8%
+  (Depth right) or 1% (Depth left): slow modulation is as wide as before,
+  fast modulation gets shallow instead of noisy. Above 4 kHz the result is
+  now 55 – 60 dB under the note. Moving lengths are read with a cubic
+  interpolation.
+- **Shimmer** feeds back only 120 Hz – 4.5 kHz of the octave above, so hiss
+  is no longer raised an octave on every pass (non-harmonic energy from -6 to
+  -15 dB, above 4 kHz from -24 to -41 dB).
+- **Wear Warm, Fold and Fuzz** amplified quiet signals inside the heads'
+  feedback (up to 30 times for Fuzz): the loop lifted its own noise and, with
+  enough Feedback, played by itself from nothing. Now none of them is louder
+  than its input near silence; repeats still saturate, fold and fuzz, and die
+  away.
+
+### Added
+- **Input Gate** (`in_gate`, LOOP page knob 8, editor Recording panel; -60 dB
+  to start with): below the threshold the input fades, 40 dB down 6 dB under
+  it, after a 60 ms hold, so the hiss of the microphone or of a quiet line
+  does not ring on in the reverb and the heads. Off, -70, -60, -50, -40 dB.
+
+### Changed
+- LOOP page: knob 8 is the Input Gate (Vari-Speed stays on PLAY).
+- Parameter keys frozen again in `tests/fixtures/params_0.13.0.txt`.
+
 ## [0.12.1] — editor layout
 
 ### Changed
@@ -220,6 +289,8 @@ granulation), EQ, delay and reverb, clock from the internal BPM, the Move or
 MIDI, and Heimat Solo with recording, Sound on Sound, marker editing and saving
 reels. 0.5.0 fixed the spacing of overlapping genes.
 
+[0.14.0]: https://github.com/CairnDebil/schwung-heimat/releases/tag/v0.14.0
+[0.13.0]: https://github.com/CairnDebil/schwung-heimat/releases/tag/v0.13.0
 [0.12.1]: https://github.com/CairnDebil/schwung-heimat/releases/tag/v0.12.1
 [0.12.0]: https://github.com/CairnDebil/schwung-heimat/releases/tag/v0.12.0
 [0.11.0]: https://github.com/CairnDebil/schwung-heimat/releases/tag/v0.11.0

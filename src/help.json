@@ -68,7 +68,28 @@
         "a cell: modulated.",
         "Shift+Track 1: MOD 1",
         "(Wave, Random), again",
-        "MOD 2 (Follow, Env)."
+        "MOD 2 (Follow, Env).",
+        "Hold Track + touch a",
+        "knob (no turn): both",
+        "ways / one way.",
+        "A tick on the bar:",
+        "where it is now."
+      ]
+    },
+    {
+      "title": "TEMP and reset",
+      "lines": [
+        "Hold Undo, change",
+        "anything, let go: all",
+        "comes back. Shift +",
+        "Undo: stays on until",
+        "Undo again.",
+        "Hold Delete + turn or",
+        "touch a knob: back to",
+        "its start value.",
+        "PLAY knob 6: DJ",
+        "filter, LP left, HP",
+        "right."
       ]
     },
     {
@@ -170,7 +191,11 @@
         "keep all. Undo: back.",
         "LOOP, KEYS: skip the",
         "noise of the buttons",
-        "at start and end."
+        "at start and end.",
+        "GATE (LOOP): quiet",
+        "input fades out, so",
+        "its hiss does not",
+        "ring on in the FX."
       ]
     },
     {

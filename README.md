@@ -84,7 +84,19 @@ it installs over Heimat Solo and keeps your settings and reels.
   decay, or held while a pad is down, or looping; started by the pads, the
   clock or both). Up to 16 routes, each with a depth from -100% to +100% of the
   control's range. The knob itself never moves: what you set is what is saved,
-  and the routes are saved with the session (`mod_routes`).
+  and the routes are saved with the session (`mod_routes`). Each route swings
+  both ways around the knob or pushes one way (new in 0.14; Wave and Random
+  start both ways, Follow and Envelope one way), and each modulated cell shows
+  a tick where the modulation has taken its control right now. *Restart Mods
+  On Clock* (SETUP 2) starts Wave and Random from the top when the clock
+  starts.
+* **DJ filter** (new in 0.14, PLAY knob 6): one knob, last before the output.
+  To the left a low-pass from 20 kHz down to 40 Hz, to the right a high-pass
+  from 20 Hz up to 10 kHz, nothing in the middle; the resonance grows as it
+  closes. It is a continuous control, so modulators can move it.
+* **TEMP** (new in 0.14): hold Undo and change anything; let go and every
+  knob, choice and route is back where it was. Shift + Undo keeps it on until
+  Undo again. A plain tap of Undo still undoes.
 * **Effects** (all off at their defaults): a three-band **EQ** (low shelf at
   180 Hz, a mid band you can tune from 100 Hz to 8 kHz, high shelf at 5 kHz,
   ±15 dB each), the **Heads** (below) and a **Reverb** (new in 0.8, below). They
@@ -151,6 +163,10 @@ it installs over Heimat Solo and keeps your settings and reels.
   overdub, the last ones get back what was there before. Only when you press:
   a start or stop on a clock tick (Record Sync) or at the end of a Record
   Length is left alone.
+* **Input Gate** (new in 0.13, LOOP page, default -60 dB): below the
+  threshold the input fades, 40 dB down 6 dB under it, after a short hold,
+  so the hiss of the microphone or of a quiet line does not ring on in the
+  reverb and the heads. Off, -70, -60, -50, -40 dB.
 * **Clock**: internal BPM, Move's transport, or MIDI clock, divided from 1/16 to a
   bar. A tick steps to the next gene (*Gene Shift*) or makes the start point glide
   through the splice (*Time Stretch*); *Auto* uses Gene Shift up to Morph 2/1 and
@@ -192,6 +208,10 @@ and the left / right arrows light as reverse / forward windows.
 | **Shift + Track 1** | MOD 1 (Wave, Random), again: MOD 2 (Follow, Envelope) |
 | **Hold Track 1–4 + turn a knob** | Route Wave, Random, Follow or Envelope to that knob's control: the turn sets the depth (Shift for fine steps), back to 0 removes it. Modulated cells carry a flag on their left edge. The page changes only if you let go without turning |
 | **Hold Track 1–4 + Delete** | Remove every route of that modulator |
+| **Hold Track 1–4 + touch a knob** (without turning) | That route swings both ways around the knob, or pushes one way only |
+| **Hold Undo** | TEMP: change anything (knobs, pads, routes), let go and it all comes back. A plain tap of Undo still undoes |
+| **Shift + Undo** | TEMP stays on until you press Undo again |
+| **Hold Delete + turn or touch a knob** | That control goes back to its starting value |
 | **Shift + Track 3** | Straight to the HEADS page |
 | **Knobs 1–8** | The eight cells of the page. Turn or touch: name and value appear in place of the cells; Shift for fine steps |
 | **Record** | Record over the current splice; again to stop |
@@ -200,7 +220,7 @@ and the left / right arrows light as reverse / forward windows.
 | **Shift + Capture** | TRIM the selected splice (knob 1 start, knob 2 end, knob 3 zoom; jog click or Capture cuts, Back cancels) |
 | **Jog** | REEL: move the cursor (Shift = fine); click adds a marker. Elsewhere: choose the splice |
 | **Delete** | Tap: delete the marker under the cursor, or join the current splice with the next. Hold 1.2 s: clear all markers. Shift + hold 2 s: new empty reel |
-| **Undo** | Undo the last marker edit, new-splice recording or trim |
+| **Undo** | Tap: undo the last marker edit, new-splice recording or trim. Hold: TEMP |
 | **Copy** | Auto-splice on transients (sensitivity on the REEL page) |
 | **Steps 1–16** | Select a splice (banks of 16 follow the selection) |
 | **Pads** | Follow Pad Mode (Pitch / Splice / Drone). On the REEL page a pad plays its splice while held |
@@ -226,8 +246,8 @@ number of controls it drives. MOD 2: **SRC**, **GAIN**, **RISE**, **FALL**
 (Follow), **ATK**, **DCY**, **MODE**, **TRIG** (Envelope).
 
 LOOP (Track 3 twice): **LEN** (Record Length), **AFTR** (After Recording),
-**HEAD** (Overdub Head), **KEYS** (Trim Key Noise), **SYNC**, **SOS**, **BPM** and **SPD**
-(Vari-Speed), with the bars filling while you record.
+**HEAD** (Overdub Head), **KEYS** (Trim Key Noise), **SYNC**, **SOS**, **BPM** and
+**GATE** (Input Gate), with the bars filling while you record.
 
 Each effect has its own page. EQ (Track 4 three times): **LOW**, **MID**, **FREQ**,
 **HIGH**, then **MIX** (to the heads), **REV** (to the reverb), **RFX** (record
@@ -313,7 +333,13 @@ as a demo on a made-up reel.
 
 ## Beta
 
-Version 0.12.1 tidies the editor (trim controls under the reel, a cleaner
+Version 0.14.0 brings the basic gestures for playing live: TEMP on Undo,
+Delete + knob back to the start value, a polarity for each route, the live
+value on modulated cells and a DJ filter. 0.13.0 cleaned up the noise of the effects: the reverb's modulation
+bends pitch smoothly and never faster than about 1%, the shimmer feeds back
+only the band that sings, the Wear of the heads never lifts the loop's own
+noise, and an Input Gate keeps the hiss of the input out of the effects.
+0.12.1 tidied the editor (trim controls under the reel, a cleaner
 Reverb panel). 0.12.0 added trimming: a splice can be cut to the part you want, and
 the noise of the buttons at the start and end of a recording can be left out.
 0.11.0 added four modulators (Wave, Random, Follow, Envelope), routed
@@ -328,7 +354,7 @@ issue form. [CHANGELOG.md](CHANGELOG.md) lists what changed in each version.
 
 Parameter keys are frozen: none is renamed or removed and no choice loses
 options, so saved sessions keep working
-(`tests/fixtures/params_0.12.0.txt`, checked by the tests). The one exception
+(`tests/fixtures/params_0.14.0.txt`, checked by the tests). The one exception
 was in 0.8.0, when the six `dly_*` keys of the old delay were retired; in older
 sessions they are simply ignored. A saved state from
 an older version opens with its own values, and controls it does not know start

@@ -1,4 +1,4 @@
-# Heimat 0.12.1 — beta test sheet
+# Heimat 0.14.0 — beta test sheet
 
 Thank you for testing. Heimat has passed its offline tests, but it has not
 yet spent hours on real Moves. That is what this sheet is for. Each section
@@ -15,7 +15,7 @@ speakers the microphone hears the speakers.
 - [ ] Install `heimat-solo-module.tar.gz` (Schwung Manager → *Modules* →
       custom module, or `scripts/install.sh`) and restart the Move.
 - [ ] Open Heimat → **Menu** → **About / DSP load**: it reads
-      `HEIMAT 0.12.1 BETA`. Keep this screen in mind: you will use it for the
+      `HEIMAT 0.14.0 BETA`. Keep this screen in mind: you will use it for the
       load figures.
 
 **How to read About / DSP load.** `DSP` is the average share of each audio
@@ -99,6 +99,21 @@ likely: always report it, with what was running.
       depth, Add route and the crosses work both ways with the Move.
 - [ ] Load (section 5) with eight routes active: `OVER` stays 0.
 
+## 3c. Playing safely (0.14)
+
+- [ ] Hold Undo, turn several knobs and play pads, let go: everything is
+      back. Tap Undo alone: it undoes as before. Shift + Undo: TMP stays in the
+      header until Undo again.
+- [ ] **Check first**: Undo, Delete and the Track buttons react when
+      released (needed for holding them). If holding Undo does nothing, report
+      it.
+- [ ] Hold Delete and turn a knob: back to its start value, no marker
+      deleted; same with a touch.
+- [ ] Hold Track 1 and touch a modulated knob without turning: ONE WAY /
+      BOTH WAYS; the tick on the bar moves accordingly.
+- [ ] PLAY knob 6: DJ filter, smooth from both sides, no click through the
+      middle.
+
 ## 4. Effects and HEADS
 
 - [ ] Each effect on its own page: Track 4 goes MICRO, MICRO 2, EQ, HEADS,
@@ -112,6 +127,12 @@ likely: always report it, with what was running.
       top holds forever; Absorb from dense to dark; Depth left (chorus), right
       (wandering), far right (shimmer) at slow and fast Speed; Tilt dark and
       bright.
+- [ ] **Noise** (0.13): reverb Depth right and left with Speed slow and fast,
+      shimmer, heads with Warm / Fold / Fuzz at high feedback: no hiss or
+      crackle that was not in the sound; with nothing playing, silence.
+- [ ] **Input Gate** (LOOP, GATE): with SOS below 1 and the reverb on, the
+      microphone's hiss no longer rings on between phrases; playing, nothing
+      is cut. Try -70 and -50 dB too.
 - [ ] EQ and reverb at maximum, Decay forever, Depth at shimmer, for a minute —
       loud, maybe wild, but no runaway and no silence afterwards.
 - [ ] HEADS: every Routing and Mode, every Wear at full feedback; Freeze holds
@@ -134,7 +155,7 @@ minute of each step. Write down `DSP`, `PEAK` and `OVER`.
 
 ## 6. Updating from Heimat Solo
 
-- [ ] Install 0.12.1 over an installed Heimat Solo: Schwung's module menu now
+- [ ] Install 0.14.0 over an installed Heimat Solo: Schwung's module menu now
       shows **Heimat**, once, and no Heimat Solo.
 - [ ] Open it: the settings and the last reel from before the update are
       there; saved reels are still in `Samples/Heimat`.
