@@ -244,28 +244,57 @@ console.log('\n3b. Pannello Heads');
 console.log('\n3c. Modulatori');
 {
   const { ctx, page, errors } = await open(browser, { component: 'tool' });
-  await page.evaluate(() => window.__cb({ 'overtake_dsp:mod_routes': 'gene_size:0:0.250,rev_mix:3:-0.500', 'overtake_dsp:v_mo': '0.8,-0.3,0.5,1', 'overtake_dsp:v_fr': '0' }));
+  await page.evaluate(() => window.__cb({ 'overtake_dsp:mod_routes': 'gene_size:0:0.250,rev_mix:2:-0.500', 'overtake_dsp:v_mo': '0.8,-0.3,0.5', 'overtake_dsp:v_mph': '0.25,0.6', 'overtake_dsp:v_fr': '0' }));
   await page.waitForTimeout(300);
   const rt = await txt(page, '#routes');
-  check(/Wave \u2192 Gene-Size/.test(rt) && /\+25%/.test(rt) && /Envelope \u2192 Reverb Mix/.test(rt) && /-50%/.test(rt), 'i percorsi arrivano dal DSP e si leggono');
-  check(await inkPixels(page, '#mod0') > 0.005 && await inkPixels(page, '#mod3') > 0.005, 'i quattro modulatori si vedono muoversi');
-  await page.$eval('[aria-label="Depth of Wave \u2192 Gene-Size"]', (e) => { e.value = '60'; e.dispatchEvent(new Event('input', { bubbles: true })); });
-  await page.click('[aria-label="Remove Envelope \u2192 Reverb Mix"]');
-  await page.selectOption('#rSrc', '2'); await page.selectOption('#rTgt', 'scatter'); await page.click('#rAdd');
-  await page.click('[aria-label="Wave sync"] >> text=1/4');
+  check(/LFO 1 → Gene-Size/.test(rt) && /\+25%/.test(rt) && /Envelope → Reverb Mix/.test(rt) && /-50%/.test(rt), 'i percorsi arrivano dal DSP e si leggono');
+  check(await page.$$eval('.modcols > div', (d) => d.length) === 3 && !(await page.$('#mod3')), 'tre modulatori: LFO 1, LFO 2, Envelope');
+  check(await inkPixels(page, '#mod0') > 0.005 && await inkPixels(page, '#mod1') > 0.005 && await inkPixels(page, '#mod2') > 0.005, 'i tre modulatori si vedono');
+  /* the LFO is drawn as its shape: a sine has its top in the first quarter of the
+   * canvas, a ramp up has it at the end of each cycle */
+  const peakX = (sel) => page.$eval(sel, (cv) => {
+    const g = cv.getContext('2d'), d = g.getImageData(0, 0, cv.width, cv.height).data;
+    for (let y = 0; y < cv.height; y++) for (let x = 0; x < cv.width; x++) { const i = (y * cv.width + x) * 4; if (d[i + 3] > 0 && d[i] > 150 && Math.abs(d[i] - d[i + 2]) < 200) return x / cv.width; }
+    return -1;
+  });
+  const sineTop = await peakX('#mod0');
+  await page.click('[aria-label="LFO 1 shape"] >> text=Up'); await page.waitForTimeout(200);
+  const rampTop = await peakX('#mod0');
+  check(sineTop >= 0 && sineTop < 0.3 && rampTop > 0.35, `l'LFO e' disegnato come la sua forma (seno in cima a ${sineTop.toFixed(2)}, rampa a ${rampTop.toFixed(2)})`);
+  await page.click('[aria-label="LFO 1 shape"] >> text=Sine');
+  await page.$eval('[aria-label="Depth of LFO 1 → Gene-Size"]', (e) => { e.value = '60'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.click('[aria-label="Remove Envelope → Reverb Mix"]');
+  await page.selectOption('#rSrc', '1'); await page.selectOption('#rTgt', 'scatter'); await page.click('#rAdd');
+  check((await page.$$eval('#rSrc option', (o) => o.map((x) => x.textContent))).join() === 'LFO 1,LFO 2,Envelope', 'le sorgenti: LFO 1, LFO 2, Envelope');
+  await page.click('[aria-label="LFO 1 sync"] >> text=1/4');
+  await page.click('[aria-label="LFO 2 shape"] >> text=Glide');
   let c = await calls(page);
   check(c.some(([k, v]) => k === 'overtake_dsp:mod_set' && v === '0 gene_size 0.600'), 'il cursore cambia la profondita\' (mod_set 0 gene_size 0.600)');
-  check(c.some(([k, v]) => k === 'overtake_dsp:mod_set' && v === '3 rev_mix 0.000'), 'la croce toglie il percorso');
-  check(c.some(([k, v]) => k === 'overtake_dsp:mod_set' && v === '2 scatter 0.250'), 'Add route: Follow su Scatter al 25%');
-  check(c.some(([k, v]) => k === 'overtake_dsp:mod_wave_sync' && v === '5'), 'Wave sync a 1/4');
-  check(/Follow \u2192 Scatter/.test(await txt(page, '#routes')) && !/Envelope/.test(await txt(page, '#routes')), 'la lista segue le modifiche');
-  await page.click('[aria-label^="Polarity of Wave \u2192 Gene-Size"]');
+  check(c.some(([k, v]) => k === 'overtake_dsp:mod_set' && v === '2 rev_mix 0.000'), 'la croce toglie il percorso');
+  check(c.some(([k, v]) => k === 'overtake_dsp:mod_set' && v === '1 scatter 0.250'), 'Add route: LFO 2 su Scatter al 25%');
+  check(c.some(([k, v]) => k === 'overtake_dsp:mod_wave_sync' && v === '5'), 'LFO 1 sync a 1/4');
+  check(c.some(([k, v]) => k === 'overtake_dsp:mod_lfo2_shape' && v === '6'), 'LFO 2: forma Glide (casuale morbida)');
+  check(/LFO 2 → Scatter/.test(await txt(page, '#routes')) && !/Envelope/.test(await txt(page, '#routes')), 'la lista segue le modifiche');
+  await page.click('[aria-label^="Polarity of LFO 1 → Gene-Size"]');
   c = await calls(page);
-  check(c.some(([k, v]) => k === 'overtake_dsp:mod_pol' && v === '0 gene_size') && /one way/.test(await page.$eval('[aria-label^="Polarity of Wave"]', (e) => e.getAttribute('aria-label'))), 'il pulsante \u00b1 / + cambia la polarita\' del percorso');
+  check(c.some(([k, v]) => k === 'overtake_dsp:mod_pol' && v === '0 gene_size') && /one way/.test(await page.$eval('[aria-label^="Polarity of LFO 1"]', (e) => e.getAttribute('aria-label'))), 'il pulsante ± / + cambia la polarita\' del percorso');
   await page.waitForTimeout(500);
-  await page.evaluate(() => window.__cb({ 'overtake_dsp:mod_routes': 'gene_size:0:0.600:0,scatter:2:0.250:1' }));
+  await page.evaluate(() => window.__cb({ 'overtake_dsp:mod_routes': 'gene_size:0:0.600:0,scatter:1:0.250:1' }));
   await page.waitForTimeout(600);
-  check(/one way/.test(await page.$eval('[aria-label^="Polarity of Wave"]', (e) => e.getAttribute('aria-label'))) && /both ways/.test(await page.$eval('[aria-label^="Polarity of Follow"]', (e) => e.getAttribute('aria-label'))), 'la polarita\' arriva dal DSP (quarto campo)');
+  check(/one way/.test(await page.$eval('[aria-label^="Polarity of LFO 1"]', (e) => e.getAttribute('aria-label'))) && /both ways/.test(await page.$eval('[aria-label^="Polarity of LFO 2"]', (e) => e.getAttribute('aria-label'))), 'la polarita\' arriva dal DSP (quarto campo)');
+  /* patches */
+  await page.evaluate(() => window.__cb({ 'overtake_dsp:v_pat': '0,3' }));
+  await page.waitForTimeout(150);
+  check(/Slot 3$/.test((await page.$$eval('#pSlot option', (o) => o.map((x) => x.textContent)))[3]) && /Slot 2 \(empty\)/.test(await txt(page, '#pSlot')), 'gli slot pieni e vuoti si vedono');
+  await page.selectOption('#pSlot', '3'); await page.click('#pSave');
+  c = await calls(page);
+  check(!c.some(([k]) => k === 'overtake_dsp:patch_save'), 'sopra uno slot pieno non salva al primo clic');
+  await page.click('#pSave'); await page.click('#pLoad');
+  await page.selectOption('#pSlot', '2'); await page.click('#pLoad');
+  await page.click('#pInit'); c = await calls(page);
+  check(!c.some(([k]) => k === 'overtake_dsp:init'), 'Init chiede un secondo clic');
+  await page.click('#pInit'); c = await calls(page);
+  check(c.some(([k, v]) => k === 'overtake_dsp:patch_save' && v === '3') && c.filter(([k]) => k === 'overtake_dsp:patch_load').length === 1 && c.some(([k]) => k === 'overtake_dsp:init'), 'Save, Load (non da uno slot vuoto) e Init arrivano al DSP');
   check(errors.length === 0, 'nessun errore JavaScript' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await ctx.close();
 }

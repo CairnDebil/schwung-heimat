@@ -1751,8 +1751,26 @@ int main(int argc, char **argv)
         }
         if (f) fclose(f);
         CHECK(listed == 62 && kept == listed, "le %d chiavi della 0.8.0 esistono tutte, stesso tipo, nessuna opzione persa", listed);
-        /* the newest list names every key there is */
+        /* 0.15.0 retired the Vari-Speed overdub head and the Random and Follow modulators, nothing else */
         f = fopen("tests/fixtures/params_0.14.0.txt", "r");
+        listed = kept = 0;
+        int retired15 = 0;
+        while (f && fgets(line, sizeof line, f)) {
+            char key[64], type[16]; int nopt = 0;
+            if (line[0] == '#' || sscanf(line, "%63s %15s %d", key, type, &nopt) != 3) continue;
+            if (!strcmp(key, "rec_head") || !strncmp(key, "mod_rand_", 9) || !strncmp(key, "mod_follow_", 11)) { retired15++; continue; }
+            listed++;
+            const int i = param_index(key);
+            if (i < 0) { printf("      manca la chiave %s\n", key); continue; }
+            const pdef_t *d = &g_params[i];
+            const char *t = d->type == T_FLOAT ? "float" : d->type == T_INT ? "int" : "enum";
+            if (strcmp(t, type) != 0 || (d->type == T_ENUM && d->nopts < nopt)) { printf("      %s cambiata\n", key); continue; }
+            kept++;
+        }
+        if (f) fclose(f);
+        CHECK(retired15 == 9 && kept == listed, "dalla 0.14.0: %d chiavi restano, 9 ritirate (testina Vari-Speed, Random, Follow)", listed);
+        /* the newest list names every key there is */
+        f = fopen("tests/fixtures/params_0.15.0.txt", "r");
         listed = kept = 0;
         while (f && fgets(line, sizeof line, f)) {
             char key[64], type[16]; int nopt = 0;
@@ -1766,7 +1784,7 @@ int main(int argc, char **argv)
             kept++;
         }
         if (f) fclose(f);
-        CHECK(listed == P_COUNT && kept == listed, "le %d chiavi della 0.14.0 sono tutte quelle che ci sono", listed);
+        CHECK(listed == P_COUNT && kept == listed, "le %d chiavi della 0.15.0 sono tutte quelle che ci sono", listed);
 
         static const char *const files[3] = { "tests/fixtures/state_0.5.0.json", "tests/fixtures/state_0.6.0.json", "tests/fixtures/state_0.7.0.json" };
         char *js = (char *)malloc(HM_STATE_MAX);
@@ -1858,7 +1876,7 @@ int main(int argc, char **argv)
         api->destroy_instance(in);
     }
     /* --------------------------------------------------------------- 44 */
-    printf("\n44. Nastro da looper: lunghezza fissa, sovraincisione dopo, testina a Vari-Speed\n");
+    printf("\n44. Nastro da looper: lunghezza fissa, sovraincisione dopo\n");
     {
         /* Record Length: one bar at 120 BPM, then it stops by itself and plays */
         void *in = new_inst(); wait_blank(in);
@@ -1884,34 +1902,9 @@ int main(int argc, char **argv)
         CHECK(ui_num(in, "rec") == 0 && fabs(ui_num(in, "fr") - fr) < 1 && fabs(f - 660) < 8, "il secondo giro ha scritto sopra il primo (%.0f Hz), lunghezza invariata; stop ferma tutto", f);
         g_in_amp = 0; api->destroy_instance(in);
 
-        /* Overdub Head = Vari-Speed */
-        in = new_inst(); mkpath(p, sizeof p, "tones.wav"); load_wait(in, p, 10.0); h = H(in);
-        setp(in, "splice_source", "Markers"); setp(in, "pad_mode", "Drone"); setf(in, "organize", 0.35);
-        setf(in, "sos", 0); setp(in, "rec_source", "Input"); setp(in, "rec_head", "Vari-Speed");
-        setf(in, "vari_speed", -0.5);                                            /* -1x: backwards */
-        key_on(in, 60); blocks(in, 0.6, NULL);
-        g_in_amp = 0.0;
-        setp(in, "rec_cur", "1"); blocks(in, 0.1, NULL);
-        const uint32_t lo = h->rec_lo, len = h->rec_len;
-        double p0 = ui_num(in, "rpos"); blocks(in, 0.2, NULL); double p1 = ui_num(in, "rpos");
-        double d = p1 - p0; if (d > len / 2.0) d -= len; if (d < -(double)len / 2.0) d += len;
-        CHECK(fabs(d + 0.2 * SR) < 2 * BLK, "Vari-Speed all'indietro: la testina di scrittura torna indietro (%.0f frame in 0.2 s)", d);
-        setp(in, "rec_stop", "1"); blocks(in, 0.05, NULL);
-        setf(in, "vari_speed", 1.0);                                              /* 2x */
-        blocks(in, 0.4, NULL);
-        setp(in, "rec_cur", "1"); blocks(in, (double)len / SR / 2.0 + 0.15, NULL);
-        setp(in, "rec_stop", "1");
-        float mx = 0; for (uint32_t i = lo; i < lo + len; i++) if (fabsf(h->reel->l[i]) > mx) mx = fabsf(h->reel->l[i]);
-        CHECK(mx < 1e-6f, "a 2x un giro dura mezzo splice e non lascia buchi: tutto lo splice e' stato riscritto (resto %.4f)", mx);
-        setf(in, "vari_speed", 0.0); blocks(in, 0.4, NULL);
-        g_in_freq = 500; g_in_amp = 0.4;
-        setp(in, "rec_cur", "1"); blocks(in, 0.3, NULL); setp(in, "rec_stop", "1");
-        mx = 0; for (uint32_t i = lo; i < lo + len; i++) if (fabsf(h->reel->l[i]) > mx) mx = fabsf(h->reel->l[i]);
-        CHECK(mx < 0.01f, "nastro fermo: la testina non scrive (%.4f)", mx);
-        g_in_amp = 0; api->destroy_instance(in);
     }
     /* --------------------------------------------------------------- 45 */
-    printf("\n45. Modulatori: Wave, Random, Follow, Envelope e i loro percorsi\n");
+    printf("\n45. Modulatori: LFO 1, LFO 2, Envelope e i loro percorsi\n");
     {
         void *in = inst_with("sine16m.wav", 1); hm_t *h = H(in);
         char b[1024];
@@ -1939,7 +1932,7 @@ int main(int argc, char **argv)
         CHECK(h->n_mr == 0 && h->p[P_VOLUME] == 0.2f, "profondita' 0: il percorso sparisce e il controllo torna al knob");
         setp(in, "mod_set", "0 pad_mode 0.5");
         CHECK(h->n_mr == 0, "le scelte (enum) non si modulano");
-        for (int k = 0; k < 20; k++) { char m[64]; snprintf(m, sizeof m, "%d %s 0.3", k % 4, g_params[k % 5].key); setp(in, "mod_set", m); }
+        for (int k = 0, n = 0; k < P_COUNT && n < 20; k++) if (g_params[k].type == T_FLOAT) { char m[64]; snprintf(m, sizeof m, "%d %s 0.3", n % 3, g_params[k].key); setp(in, "mod_set", m); n++; }
         CHECK(h->n_mr <= HM_MAX_ROUTES && h->n_mr == 16, "al massimo 16 percorsi (%d)", h->n_mr);
         setp(in, "mod_clear", "2");
         int left2 = 0; for (int r = 0; r < h->n_mr; r++) if (h->mr[r].src == 2) left2++;
@@ -1947,57 +1940,59 @@ int main(int argc, char **argv)
         setp(in, "mod_clear", "all");
         CHECK(h->n_mr == 0 && fabsf(h->p[P_GENE] - h->base[P_GENE]) < 1e-6f, "mod_clear all: nessun percorso, tutto al knob");
 
-        /* Random, stepped at 1/4 note at 120 BPM: two new values a second */
-        setp(in, "mod_rand_sync", "1/4"); setf(in, "bpm", 120); blocks(in, 0.1, NULL);
+        /* LFO 2 with the Random shape, synced at 1/4 at 120 BPM: two new values a second */
+        setp(in, "mod_lfo2_shape", "Random"); setp(in, "mod_lfo2_sync", "1/4"); setf(in, "bpm", 120); blocks(in, 0.1, NULL);
         float last = h->mod[1]; int changes = 0;
         for (int k = 0; k < (int)(2.0 * SR / BLK); k++) { blocks(in, (double)BLK / SR, NULL); if (h->mod[1] != last) changes++; last = h->mod[1]; }
-        CHECK(changes >= 3 && changes <= 5, "Random a gradini, 1/4 a 120 BPM: %d valori nuovi in 2 s", changes);
-        setf(in, "mod_rand_smooth", 1.0); changes = 0;
+        CHECK(changes >= 3 && changes <= 5, "LFO 2 Random a 1/4, 120 BPM: %d valori nuovi in 2 s", changes);
+        setp(in, "mod_lfo2_shape", "Smooth Random"); changes = 0;
         for (int k = 0; k < (int)(1.0 * SR / BLK); k++) { blocks(in, (double)BLK / SR, NULL); if (h->mod[1] != last) changes++; last = h->mod[1]; }
-        CHECK(changes > 200, "Random con Smooth: scivola da un valore all'altro (%d blocchi su 344 diversi)", changes);
-
-        /* Follow the input onto Scatter */
-        setp(in, "mod_set", "2 scatter 1"); setf(in, "scatter", 0);
-        g_in_freq = 300; g_in_amp = 0.5; blocks(in, 0.5, NULL);
-        const float up = h->p[P_SCATTER];
-        g_in_amp = 0; blocks(in, 3.5, NULL);
-        CHECK(up > 0.8f && h->p[P_SCATTER] < 0.02f, "Follow: l'ingresso alza Scatter (%.2f), il silenzio lo riporta giu' (%.3f)", up, h->p[P_SCATTER]);
-        setp(in, "mod_clear", "all");
+        CHECK(changes > 200, "Smooth Random: scivola da un valore all'altro (%d blocchi su 344 diversi)", changes);
+        /* the two LFOs are independent */
+        setp(in, "mod_lfo2_shape", "Triangle"); setp(in, "mod_lfo2_sync", "Free"); setf(in, "mod_lfo2_rate", 0.1); setf(in, "mod_wave_rate", 0.7);
+        blocks(in, 0.3, NULL);
+        { double a0 = h->m_ph[0], b0 = h->m_ph[1]; blocks(in, 0.1, NULL);
+          double da = h->m_ph[0] - a0, db = h->m_ph[1] - b0; if (da < 0) da += 1; if (db < 0) db += 1;
+          CHECK(da > 5 * db, "LFO 1 e LFO 2 hanno ciascuno la sua velocita' (%.3f / %.3f di giro in 0.1 s)", da, db); }
 
         /* Envelope from the pads */
         setf(in, "mod_env_attack", 0); setf(in, "mod_env_decay", 0.4);       /* 1 ms, 30 ms */
         key_on(in, 60); blocks(in, 0.01, NULL);
-        const float pk = h->mod[3];
+        const float pk = h->mod[2];
         blocks(in, 0.2, NULL);
-        CHECK(pk > 0.5f && h->mod[3] == 0.0f, "Envelope AD da un pad: sale (%.2f) e ricade a zero", pk);
+        CHECK(pk > 0.5f && h->mod[2] == 0.0f, "Envelope AD da un pad: sale (%.2f) e ricade a zero", pk);
         key_off(in, 60); setp(in, "mod_env_mode", "Hold");
         key_on(in, 60); blocks(in, 0.5, NULL);
-        const float held = h->mod[3];
+        const float held = h->mod[2];
         key_off(in, 60); blocks(in, 0.3, NULL);
-        CHECK(held > 0.99f && h->mod[3] == 0.0f, "Hold: resta su finche' il pad e' premuto, poi ricade");
+        CHECK(held > 0.99f && h->mod[2] == 0.0f, "Hold: resta su finche' il pad e' premuto, poi ricade");
         setp(in, "mod_env_mode", "AD"); setp(in, "mod_env_trigger", "Clock"); setp(in, "clock_source", "Internal"); setp(in, "clock_div", "1/4");
         int fires = 0; float pe = 0;
-        for (int k = 0; k < (int)(2.0 * SR / BLK); k++) { blocks(in, (double)BLK / SR, NULL); if (h->mod[3] > 0.5f && pe <= 0.5f) fires++; pe = h->mod[3]; }
+        for (int k = 0; k < (int)(2.0 * SR / BLK); k++) { blocks(in, (double)BLK / SR, NULL); if (h->mod[2] > 0.5f && pe <= 0.5f) fires++; pe = h->mod[2]; }
         key_on(in, 61); blocks(in, 0.005, NULL);
         CHECK(fires >= 3 && fires <= 5, "trigger Clock: un inviluppo per tick (%d in 2 s a 1/4, 120 BPM)", fires);
         key_off(in, 61); setp(in, "clock_source", "Off");
 
         /* routes are saved with the session and come back */
-        setp(in, "mod_set", "1 gene_size -0.25"); setp(in, "mod_set", "3 rev_mix 0.6");
+        setp(in, "mod_set", "1 gene_size -0.25"); setp(in, "mod_set", "2 rev_mix 0.6");
         char *js = (char *)malloc(HM_STATE_MAX);
         api->get_param(in, "state", js, HM_STATE_MAX);
         void *in2 = new_inst(); hm_t *h2 = H(in2);
         setp(in2, "state", js);
         api->get_param(in2, "mod_routes", b, sizeof b);
-        CHECK(h2->n_mr == 2 && strstr(b, "gene_size:1:-0.250") && strstr(b, "rev_mix:3:0.600"), "i percorsi tornano con lo stato salvato: \"%s\"", b);
+        CHECK(h2->n_mr == 2 && strstr(b, "gene_size:1:-0.250") && strstr(b, "rev_mix:2:0.600"), "i percorsi tornano con lo stato salvato: \"%s\"", b);
         setp(in2, "state", "{\"sample_path\":\"\",\"morph\":0.4}");
         CHECK(h2->n_mr == 0, "uno stato completo senza percorsi (versioni precedenti) li toglie");
-        setp(in2, "state", "{\"morph\":0.5,\"mod_routes\":\"width:0:0.400,unknown_key:1:0.5\"}");
+        setp(in2, "state", "{\"morph\":0.5,\"mod_routes2\":\"width:0:0.400,unknown_key:1:0.5\"}");
         CHECK(h2->n_mr == 1 && h2->mr[0].tgt == P_WIDTH, "chiavi sconosciute nei percorsi: ignorate");
+        /* routes of 0.14 and before: Wave -> LFO 1, Envelope -> Envelope, Random and Follow dropped */
+        setp(in2, "state", "{\"morph\":0.5,\"mod_routes\":\"width:0:0.400,morph:1:0.2,scatter:2:0.3,slide:3:0.5:0\"}");
+        api->get_param(in2, "mod_routes", b, sizeof b);
+        CHECK(h2->n_mr == 2 && strstr(b, "width:0:0.400") && strstr(b, "slide:2:0.500:0"), "percorsi di prima della 0.15: Wave e Envelope restano, Random e Follow no (\"%s\")", b);
         free(js);
         api->destroy_instance(in2);
         char js2[2048]; api->get_param(in, "ui_state", js2, sizeof js2);
-        CHECK(strstr(js2, "\"mrv\":") && strstr(js2, "\"mo\":["), "ui_state porta la versione dei percorsi e i quattro valori");
+        CHECK(strstr(js2, "\"mrv\":") && strstr(js2, "\"mo\":["), "ui_state porta la versione dei percorsi e i tre valori");
         api->destroy_instance(in);
     }
     /* --------------------------------------------------------------- 46 */
@@ -2142,7 +2137,7 @@ int main(int argc, char **argv)
         CHECK(strcmp(b, "volume:0:0.400:0") == 0 && mn >= 0.499f && mx > 0.88f, "Wave unipolare: solo sopra il knob (%.2f .. %.2f), \"%s\"", mn, mx, b);
         setp(in, "mod_clear", "all");
         setf(in, "mod_env_attack", 0); setf(in, "mod_env_decay", 0.6);
-        setp(in, "mod_set", "3 volume 0.3"); setp(in, "mod_pol", "3 volume");
+        setp(in, "mod_set", "2 volume 0.3"); setp(in, "mod_pol", "2 volume");
         blocks(in, 0.4, NULL);
         const float idle = h->p[P_VOLUME];
         CHECK(fabsf(idle - 0.2f) < 0.01f, "Envelope bipolare a riposo: sotto il knob (%.2f)", idle);
@@ -2152,7 +2147,7 @@ int main(int argc, char **argv)
         api->get_param(in, "mod_live", b, sizeof b);
         CHECK(strstr(b, "volume:0.2") && strstr(b, "scatter:"), "mod_live: dove sono ora i controlli modulati (\"%s\")", b);
         /* a saved route keeps its polarity; an old one without it takes the source's */
-        setp(in, "state", "{\"mod_routes\":\"width:2:0.400,morph:0:0.300:0\"}");
+        setp(in, "state", "{\"mod_routes2\":\"width:2:0.400,morph:0:0.300:0\"}");
         int okp = 0; for (int r = 0; r < h->n_mr; r++) { if (h->mr[r].tgt == P_WIDTH && h->mr[r].bip == 0) okp++; if (h->mr[r].tgt == P_MORPH && h->mr[r].bip == 0) okp++; }
         CHECK(okp == 2, "percorsi salvati: polarita' letta, o quella della sorgente se manca");
         setp(in, "mod_clear", "all");
@@ -2162,7 +2157,7 @@ int main(int argc, char **argv)
         setp(in, "temp", "begin");
         api->get_param(in, "ui_state", b, sizeof b);
         const int tmp_on = strstr(b, "\"tmp\":1") != NULL;
-        setf(in, "gene_size", 0.9); setf(in, "rev_mix", 0.8); setp(in, "pad_mode", "Drone"); setp(in, "mod_set", "0 slide 0"); setp(in, "mod_set", "2 morph 0.5");
+        setf(in, "gene_size", 0.9); setf(in, "rev_mix", 0.8); setp(in, "pad_mode", "Drone"); setp(in, "mod_set", "0 slide 0"); setp(in, "mod_set", "1 morph 0.5");
         blocks(in, 0.05, NULL);
         setp(in, "temp", "end"); blocks(in, 0.05, NULL);
         api->get_param(in, "mod_routes", b, sizeof b);
@@ -2195,6 +2190,51 @@ int main(int argc, char **argv)
         setp(in, "mod_restart", "On"); setp(in, "clock_source", "Internal"); blocks(in, (double)BLK / SR, NULL);
         CHECK(h->m_ph[0] < 0.01, "il clock parte: la Wave riparte da capo (fase %.3f)", h->m_ph[0]);
         api->destroy_instance(in);
+    }
+    /* --------------------------------------------------------------- 49 */
+    printf("\n49. Patch salvate, Init, Trim Key Noise dal rilascio del tasto\n");
+    {
+        char dd[300]; snprintf(dd, sizeof dd, "%s/pdata", g_dir); setenv("HEIMAT_DATA_DIR", dd, 1);
+        void *in = inst_with("sine16m.wav", 1); hm_t *h = H(in);
+        char b[1024];
+        #define WAIT_PATCH() do { for (int w_ = 0; w_ < 300 && atomic_load(&h->patch_op); w_++) { blocks(in, 0.002, NULL); struct timespec ts_ = { 0, 2000000 }; nanosleep(&ts_, NULL); } blocks(in, 0.01, NULL); } while (0)
+        setf(in, "gene_size", 0.62); setf(in, "rev_mix", 0.4); setp(in, "pad_mode", "Drone"); setf(in, "bpm", 97); setf(in, "volume", 0.3);
+        setp(in, "mod_set", "1 scatter 0.3");
+        setp(in, "patch_save", "3"); WAIT_PATCH();
+        api->get_param(in, "patches", b, sizeof b);
+        CHECK(strcmp(b, "3") == 0, "patch salvata nello slot 3 (elenco: \"%s\")", b);
+        setf(in, "gene_size", 0.1); setf(in, "rev_mix", 0.0); setp(in, "pad_mode", "Pitch"); setf(in, "bpm", 140); setf(in, "volume", 0.8); setp(in, "mod_clear", "all");
+        setp(in, "patch_load", "3"); WAIT_PATCH(); blocks(in, 0.05, NULL);
+        CHECK(fabsf(h->base[P_GENE] - 0.62f) < 1e-3f && fabsf(h->base[P_REV_MIX] - 0.4f) < 1e-3f && (int)h->base[P_PAD_MODE] == 2 && h->n_mr == 1,
+              "richiamata: suono, scelte e percorsi tornano");
+        CHECK(fabsf(h->base[P_BPM] - 140) < 1e-3f && fabsf(h->base[P_VOLUME] - 0.8f) < 1e-3f && h->reel && h->reel->frames > 0,
+              "tempo, volume e bobina restano quelli di adesso");
+        /* Init: everything of the sound to its start, the sound before kept in slot 0 */
+        setp(in, "init", "1"); WAIT_PATCH(); blocks(in, 0.02, NULL);
+        CHECK(fabsf(h->base[P_GENE] - g_params[P_GENE].def) < 1e-6f && h->n_mr == 0 && fabsf(h->base[P_BPM] - 140) < 1e-3f, "Init: suono di partenza, nessun percorso, tempo invariato");
+        api->get_param(in, "patches", b, sizeof b);
+        CHECK(strcmp(b, "0,3") == 0, "il suono di prima dell'Init e' nello slot 0 (\"%s\")", b);
+        setp(in, "patch_load", "0"); WAIT_PATCH(); blocks(in, 0.05, NULL);
+        CHECK(fabsf(h->base[P_GENE] - 0.62f) < 1e-3f && h->n_mr == 1, "e si richiama: Init si annulla");
+        setp(in, "patch_load", "9"); WAIT_PATCH();
+        CHECK(fabsf(h->base[P_GENE] - 0.62f) < 1e-3f, "uno slot vuoto non cambia niente");
+        #undef WAIT_PATCH
+        api->destroy_instance(in);
+        setenv("HEIMAT_NO_STATE", "1", 1);
+
+        /* Trim Key Noise from the key: nothing is written until the key is let go, then the trim */
+        in = new_inst(); wait_blank(in);
+        g_in_freq = 300; g_in_amp = 0.3;
+        setf(in, "sos", 0); setp(in, "rec_source", "Input"); setp(in, "rec_trim", "100 ms");
+        setp(in, "rec_new", "key"); blocks(in, 0.3, NULL);
+        const double held = ui_num(in, "fr");
+        setp(in, "rec_key_up", "1"); blocks(in, 1.0, NULL); setp(in, "rec_stop", "1"); blocks(in, 0.05, NULL);
+        const double fr = ui_num(in, "fr");
+        CHECK(held < 1 && fabs(fr - 0.8 * SR) <= BLK + 2, "tasto tenuto 0.3 s: niente scritto; dal rilascio 100 ms saltati, 100 ms tolti alla fine (%.2f s)", fr / SR);
+        setp(in, "rec_new", "key"); blocks(in, 2.0, NULL);
+        CHECK(ui_num(in, "fr") > fr + 0.3 * SR, "se il rilascio non arriva, dopo 1.5 s registra comunque");
+        setp(in, "rec_stop", "1");
+        g_in_amp = 0; api->destroy_instance(in);
     }
     snprintf(cmd, sizeof cmd, "rm -rf %s", g_dir); if (system(cmd)) { }
     printf("\n%s (%d controlli falliti)\n", g_fail ? "ESITO: FALLITO" : "ESITO: TUTTO OK", g_fail);

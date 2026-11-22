@@ -1,13 +1,13 @@
 {
-  "version": "0.14.0",
-  "download_url": "https://github.com/CairnDebil/schwung-heimat/releases/download/v0.14.0/heimat-solo-module.tar.gz",
+  "version": "0.15.0",
+  "download_url": "https://github.com/CairnDebil/schwung-heimat/releases/download/v0.15.0/heimat-solo-module.tar.gz",
   "name": "Heimat",
   "description": "Tape and microsound instrument: record, splice by hand, granulate with envelopes, scatter and spread, tape heads and reverb, clock sync and reel saving",
   "repo_url": "https://github.com/CairnDebil/schwung-heimat",
   "modules": {
     "heimat-solo": {
-      "version": "0.14.0",
-      "download_url": "https://github.com/CairnDebil/schwung-heimat/releases/download/v0.14.0/heimat-solo-module.tar.gz",
+      "version": "0.15.0",
+      "download_url": "https://github.com/CairnDebil/schwung-heimat/releases/download/v0.15.0/heimat-solo-module.tar.gz",
       "name": "Heimat",
       "description": "Tape and microsound instrument: record, splice by hand, granulate with envelopes, scatter and spread, tape heads and reverb, clock sync and reel saving",
       "repo_url": "https://github.com/CairnDebil/schwung-heimat"

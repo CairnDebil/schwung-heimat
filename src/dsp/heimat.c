@@ -73,7 +73,7 @@
 #define HM_MIN_SPLICE     32               /* shortest allowed splice, frames */
 #define HM_STATE_MAX      4096
 #define HM_STATE_FORMAT   1                /* bump only if a saved key changes meaning */
-#define HM_MODS           4
+#define HM_MODS           3                /* LFO 1, LFO 2, Envelope */
 #define HM_MAX_ROUTES     16
 #define HM_TRIM_MIN       2048             /* shortest splice a trim may leave, frames */
 #define HM_TRIM_FADE      0.003            /* fade at a cut, seconds */
@@ -113,10 +113,9 @@ enum {
     P_REV_MIX, P_FX_REC,
     P_HD_MIX, P_HD_TIME, P_HD_HEADS, P_HD_SPACE, P_HD_FDBK, P_HD_REV, P_HD_WEAR, P_HD_WAMT, P_HD_MODE, P_HD_ROUTE, P_HD_FREEZE,
     P_GENE_REV, P_SPR_MODE,
-    P_PATTERN, P_PAT_SEED, P_REC_LEN, P_REC_AFTER, P_REC_HEAD,
+    P_PATTERN, P_PAT_SEED, P_REC_LEN, P_REC_AFTER,
     P_M1_SHAPE, P_M1_RATE, P_M1_SYNC, P_M1_RETRIG,
-    P_M2_RATE, P_M2_SMOOTH, P_M2_SYNC, P_M2_RETRIG,
-    P_M3_SRC, P_M3_GAIN, P_M3_ATK, P_M3_REL,
+    P_M2_SHAPE, P_M2_RATE, P_M2_SYNC, P_M2_RETRIG,
     P_M4_ATK, P_M4_DCY, P_M4_MODE, P_M4_TRIG,
     P_REC_TRIM,
     P_IN_GATE,
@@ -160,10 +159,8 @@ static const char *const OPT_SPRMODE[] = { "Free", "Semitones", "Octaves", "Fift
 static const char *const OPT_PATTERN[] = { "Off", "2", "3", "4", "5", "6", "8", "12", "16", "32" };
 static const char *const OPT_RECLEN[] = { "Free", "1 bar", "2 bars", "4 bars", "8 bars", "16 bars" };
 static const char *const OPT_RECAFT[] = { "Play", "Overdub" };
-static const char *const OPT_RECHD[]  = { "Steady", "Vari-Speed" };
-static const char *const OPT_MWAVE[]  = { "Sine", "Triangle", "Ramp Up", "Ramp Down", "Square" };
+static const char *const OPT_MWAVE[]  = { "Sine", "Triangle", "Ramp Up", "Ramp Down", "Square", "Random", "Smooth Random" };
 static const char *const OPT_MSYNC[]  = { "Free", "4 bars", "2 bars", "1 bar", "1/2", "1/4", "1/8", "1/16" };
-static const char *const OPT_FSRC[]   = { "Input", "Output" };
 static const char *const OPT_EMODE[]  = { "AD", "Hold", "Loop" };
 static const char *const OPT_ETRIG[]  = { "Pads", "Clock", "Pads + Clock" };
 static const char *const OPT_RTRIM[]  = { "Off", "50 ms", "100 ms", "200 ms", "300 ms", "500 ms" };
@@ -240,19 +237,14 @@ static const pdef_t g_params[P_COUNT] = {
     [P_PAT_SEED]  = PI("pattern_seed",     "Pattern Seed",       "Seed",  1, 999, 1),
     [P_REC_LEN]   = PE("rec_length",       "Record Length",      "RecLen", OPT_RECLEN, 6, 0),
     [P_REC_AFTER] = PE("rec_after",        "After Recording",    "After", OPT_RECAFT, 2, 0),
-    [P_REC_HEAD]  = PE("rec_head",         "Overdub Head",       "RecHd", OPT_RECHD, 2, 0),
-    [P_M1_SHAPE]  = PE("mod_wave_shape",   "Wave Shape",         "WShape", OPT_MWAVE, 5, 0),
-    [P_M1_RATE]   = PF("mod_wave_rate",    "Wave Rate",          "WRate", 0.0f, 1.0f, 0.4f, 0.0025f),
-    [P_M1_SYNC]   = PE("mod_wave_sync",    "Wave Sync",          "WSync", OPT_MSYNC, 8, 0),
-    [P_M1_RETRIG] = PE("mod_wave_retrig",  "Wave Restart",       "WRst",  OPT_ONOFF, 2, 0),
-    [P_M2_RATE]   = PF("mod_rand_rate",    "Random Rate",        "RRate", 0.0f, 1.0f, 0.4f, 0.0025f),
-    [P_M2_SMOOTH] = PF("mod_rand_smooth",  "Random Smooth",      "RSmth", 0.0f, 1.0f, 0.0f, 0.0025f),
-    [P_M2_SYNC]   = PE("mod_rand_sync",    "Random Sync",        "RSync", OPT_MSYNC, 8, 0),
-    [P_M2_RETRIG] = PE("mod_rand_retrig",  "Random On Pads",     "RRst",  OPT_ONOFF, 2, 0),
-    [P_M3_SRC]    = PE("mod_follow_src",   "Follow Source",      "FSrc",  OPT_FSRC, 2, 0),
-    [P_M3_GAIN]   = PF("mod_follow_gain",  "Follow Gain",        "FGain", 0.0f, 1.0f, 0.5f, 0.0025f),
-    [P_M3_ATK]    = PF("mod_follow_attack","Follow Attack",      "FAtk",  0.0f, 1.0f, 0.1f, 0.0025f),
-    [P_M3_REL]    = PF("mod_follow_release","Follow Release",    "FRel",  0.0f, 1.0f, 0.4f, 0.0025f),
+    [P_M1_SHAPE]  = PE("mod_wave_shape",   "LFO 1 Shape",        "L1Shp", OPT_MWAVE, 7, 0),
+    [P_M1_RATE]   = PF("mod_wave_rate",    "LFO 1 Rate",         "L1Rate", 0.0f, 1.0f, 0.4f, 0.0025f),
+    [P_M1_SYNC]   = PE("mod_wave_sync",    "LFO 1 Sync",         "L1Sync", OPT_MSYNC, 8, 0),
+    [P_M1_RETRIG] = PE("mod_wave_retrig",  "LFO 1 Restart",      "L1Rst", OPT_ONOFF, 2, 0),
+    [P_M2_SHAPE]  = PE("mod_lfo2_shape",   "LFO 2 Shape",        "L2Shp", OPT_MWAVE, 7, 1),
+    [P_M2_RATE]   = PF("mod_lfo2_rate",    "LFO 2 Rate",         "L2Rate", 0.0f, 1.0f, 0.25f, 0.0025f),
+    [P_M2_SYNC]   = PE("mod_lfo2_sync",    "LFO 2 Sync",         "L2Sync", OPT_MSYNC, 8, 0),
+    [P_M2_RETRIG] = PE("mod_lfo2_retrig",  "LFO 2 Restart",      "L2Rst", OPT_ONOFF, 2, 0),
     [P_M4_ATK]    = PF("mod_env_attack",   "Envelope Attack",    "EAtk",  0.0f, 1.0f, 0.1f, 0.0025f),
     [P_M4_DCY]    = PF("mod_env_decay",    "Envelope Decay",     "EDcy",  0.0f, 1.0f, 0.4f, 0.0025f),
     [P_M4_MODE]   = PE("mod_env_mode",     "Envelope Mode",      "EMode", OPT_EMODE, 3, 0),
@@ -419,7 +411,8 @@ typedef struct {
     int rec_stop_armed;
     uint32_t rec_pos, rec_start, rec_lo, rec_len;
     /* modulators: Wave, Random, Follow, Envelope; up to HM_MAX_ROUTES routes */
-    float mod[HM_MODS];                    /* current outputs: Wave/Random -1..1, Follow/Envelope 0..1 */
+    float mod[HM_MODS];                    /* current outputs: LFOs -1..1, Envelope 0..1 */
+    float lfo_rnd[2][2];                   /* Random shapes: the value it comes from, the one it goes to */
     double m_ph[2];                        /* Wave and Random phases, 0..1 */
     float m_rcur, m_rtgt, m_rfrom;         /* Random: value, next step, step it glides from */
     float m_env;                           /* Follow */
@@ -473,6 +466,14 @@ typedef struct {
     atomic_uint state_gen;
     char restore_json[HM_STATE_MAX];
     atomic_int restore_ready;
+    /* patches: the sound saved in a numbered file, apart from the reel and the
+       settings of the machine (clock, input, recording) */
+    char *patch_buf;                        /* a patch about to be written */
+    atomic_int patch_op;                   /* 0 idle, 1 write patch_buf to patch_slot, 2 read patch_slot */
+    int patch_slot;
+    char patch_list[160];                  /* the slots that hold a patch, "0,1,4" */
+    atomic_uint patch_ver;
+    int rec_wait_key, rec_wait_t;          /* Trim Key Noise: hold the start until the key is let go */
 
     fx_t fx;
     heads_t hd;
@@ -959,6 +960,48 @@ static void read_state_file(hm_t *h)
     atomic_store(&h->restore_ready, 1);
 }
 
+static void patch_path(char *out, size_t n, int slot)
+{
+    snprintf(out, n, "%s/patches/%02d.json", env_or("HEIMAT_DATA_DIR", HM_DEFAULT_DATA_DIR), slot);
+}
+
+static void patch_scan(hm_t *h)
+{
+    char list[160]; int len = 0; list[0] = 0;
+    for (int s = 0; s <= 16; s++) {
+        char p[HM_PATH_MAX]; patch_path(p, sizeof p, s);
+        struct stat st;
+        if (stat(p, &st) == 0 && len < (int)sizeof list - 4) len += snprintf(list + len, sizeof list - (size_t)len, "%s%d", len ? "," : "", s);
+    }
+    memcpy(h->patch_list, list, sizeof list);
+    atomic_fetch_add(&h->patch_ver, 1);
+}
+
+static void patch_job(hm_t *h)
+{
+    const int op = atomic_load_explicit(&h->patch_op, memory_order_acquire);
+    if (!op) return;
+    char p[HM_PATH_MAX]; patch_path(p, sizeof p, h->patch_slot);
+    if (op == 1) {
+        char dir[HM_PATH_MAX];
+        snprintf(dir, sizeof dir, "%s/patches", env_or("HEIMAT_DATA_DIR", HM_DEFAULT_DATA_DIR));
+        mkdir_p(dir);
+        char tmp[HM_PATH_MAX + 8]; snprintf(tmp, sizeof tmp, "%s.tmp", p);
+        FILE *f = fopen(tmp, "wb");
+        if (f) { fputs(h->patch_buf, f); fflush(f); fsync(fileno(f)); fclose(f); rename(tmp, p); }
+    } else if (op == 2 && !atomic_load(&h->restore_ready)) {
+        FILE *f = fopen(p, "rb");
+        if (f) {
+            size_t n = fread(h->restore_json, 1, HM_STATE_MAX - 1, f);
+            fclose(f);
+            h->restore_json[n] = 0;
+            if (strstr(h->restore_json, "\"patch\"")) atomic_store(&h->restore_ready, 1);
+        }
+    } else if (op == 2) return;                          /* a restore still waits for the audio thread: try again */
+    patch_scan(h);
+    atomic_store_explicit(&h->patch_op, 0, memory_order_release);
+}
+
 static void retire_free_all(hm_t *h)
 {
     reel_t *p = atomic_exchange(&h->retire, NULL);
@@ -1014,6 +1057,7 @@ static void *worker_main(void *arg)
     unsigned last_req = 0, last_save = 0, last_gen = 0;
     int idle_ticks = 0;
     read_state_file(h);
+    patch_scan(h);
     while (atomic_load_explicit(&h->run, memory_order_acquire)) {
         unsigned s = atomic_load_explicit(&h->req_seq, memory_order_acquire);
         if (s != last_req) {
@@ -1065,6 +1109,7 @@ static void *worker_main(void *arg)
             }
             continue;
         }
+        patch_job(h);
         retire_free_all(h);
         {                                                     /* persist the settings 2 s after the last change */
             unsigned g = atomic_load_explicit(&h->state_gen, memory_order_relaxed);
@@ -1591,7 +1636,7 @@ static void rec_begin(hm_t *h, int mode)
     reel_t *r = h->reel;
     if (!r || h->rec_mode || atomic_load(&h->saving) || h->n_splices < 0 || atomic_load(&h->tj_state)) return;
     h->trim_on = 0;
-    h->rec_skip = h->rec_cut = 0; h->rec_t = 0; h->ring_n = 0;
+    h->rec_skip = h->rec_cut = 0; h->rec_t = 0; h->ring_n = 0; h->rec_wait_key = 0;
     if (mode == REC_CUR && r->frames < 2) mode = REC_NEW;      /* nothing to record over yet */
     if (mode == REC_NEW) {
         if (r->frames + HM_MIN_SPLICE >= r->cap) return;
@@ -1680,11 +1725,17 @@ static void rec_end(hm_t *h)
     atomic_fetch_add_explicit(&h->state_gen, 1, memory_order_relaxed);
 }
 
-static void rec_request(hm_t *h, int mode)
+static void rec_request(hm_t *h, int mode, int by_key)
 {
     if (h->rec_mode || h->rec_armed) return;
     if (h->p[P_REC_SYNC] > 0.5f && (int)h->p[P_CLOCK_SRC] != CLK_OFF && h->clk_running) h->rec_armed = mode;
-    else { rec_begin(h, mode); if (h->rec_mode) h->rec_skip = key_trim_frames(h); }   /* the press is heard: skip it */
+    else {
+        rec_begin(h, mode);
+        /* the press is heard, and so is the key coming back up: from a key,
+           wait for it to be let go, then skip the trim */
+        if (h->rec_mode && by_key && key_trim_frames(h)) { h->rec_wait_key = 1; h->rec_wait_t = 0; }
+        else if (h->rec_mode) h->rec_skip = key_trim_frames(h);
+    }
 }
 
 static void rec_stop_request(hm_t *h)
@@ -1760,6 +1811,30 @@ static void all_notes_off(hm_t *h)
 
 /* ----------------------------------------------------------------- state */
 
+/* controls that belong to the machine and the reel rather than to a sound:
+ * a patch does not carry them and Init leaves them alone */
+static int param_is_global(int i)
+{
+    switch (i) {
+    case P_SPLICE_SRC: case P_DIVIDE: case P_SPLICE_BASE: case P_SOS: case P_IN_GAIN: case P_REC_SRC: case P_REC_SYNC:
+    case P_CLOCK_SRC: case P_BPM: case P_MUTE: case P_SAVE48: case P_FX_REC: case P_REC_LEN: case P_REC_AFTER:
+    case P_REC_TRIM: case P_IN_GATE: case P_HD_FREEZE: case P_VOLUME:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+static void build_patch_json(const hm_t *h, char *buf, int len)
+{
+    jb_t j = { buf, len, 0, 0 };
+    jb_add(&j, "{\"patch\":1,\"state_format\":%d", HM_STATE_FORMAT);
+    for (int i = 0; i < P_COUNT; i++) if (!param_is_global(i)) jb_add(&j, ",\"%s\":%.4f", g_params[i].key, h->base[i]);
+    jb_add(&j, ",\"mod_routes2\":\"");
+    for (int r = 0; r < h->n_mr; r++) jb_add(&j, "%s%s:%d:%.3f:%d", r ? "," : "", g_params[h->mr[r].tgt].key, h->mr[r].src, (double)h->mr[r].amt, h->mr[r].bip);
+    jb_add(&j, "\"}");
+}
+
 static void build_state_json(const hm_t *h, char *buf, int len)
 {
     jb_t j = { buf, len, 0, 0 };
@@ -1767,7 +1842,7 @@ static void build_state_json(const hm_t *h, char *buf, int len)
     json_escape(h->cur_path, esc, sizeof esc);
     jb_add(&j, "{\"sample_path\":\"%s\",\"state_format\":%d", esc, HM_STATE_FORMAT);
     for (int i = 0; i < P_COUNT; i++) jb_add(&j, ",\"%s\":%.4f", g_params[i].key, h->base[i]);
-    jb_add(&j, ",\"mod_routes\":\"");
+    jb_add(&j, ",\"mod_routes2\":\"");
     for (int r = 0; r < h->n_mr; r++) jb_add(&j, "%s%s:%d:%.3f:%d", r ? "," : "", g_params[h->mr[r].tgt].key, h->mr[r].src, (double)h->mr[r].amt, h->mr[r].bip);
     jb_add(&j, "\"");
     jb_add(&j, "}");
@@ -1794,7 +1869,7 @@ static void mod_routes_changed(hm_t *h)
     atomic_fetch_add_explicit(&h->state_gen, 1, memory_order_relaxed);
 }
 
-static int mod_default_bip(int src) { return src < 2; }   /* Wave and Random swing both ways, Follow and Envelope push one way */
+static int mod_default_bip(int src) { return src < 2; }   /* the LFOs swing both ways, the Envelope pushes one way */
 
 /* amount 0 (or nearly) removes the route; bip -1 keeps the route's polarity (or the source's own for a new one) */
 static void mod_route_set_p(hm_t *h, int src, int tgt, float amt, int bip)
@@ -1831,15 +1906,17 @@ static void mod_routes_clear(hm_t *h, int which)
     if (j != h->n_mr) { h->n_mr = j; mod_routes_changed(h); }
 }
 
-/* "key:src:amount[:polarity],..." (polarity 1 = both ways, 0 = one way; without it, the source's own) */
-static void mod_routes_parse(hm_t *h, const char *s)
+/* "key:src:amount[:polarity],..." (polarity 1 = both ways, 0 = one way; without it, the source's own).
+ * old = routes saved before 0.15 ("mod_routes"), when the sources were Wave,
+ * Random, Follow, Envelope: Wave becomes LFO 1, Envelope stays, the others go. */
+static void mod_routes_parse(hm_t *h, const char *s, int old)
 {
     mod_routes_clear(h, -1);
     while (s && *s) {
-        char key[64]; int src, bip = -1; float amt; int n = 0;
+        char key[64]; int src, bip = -1; float amt;
         const int got = sscanf(s, "%63[^:]:%d:%f:%d", key, &src, &amt, &bip);
-        (void)n;
-        if (got >= 3) mod_route_set_p(h, src, param_index(key), amt, got == 4 ? bip : -1);
+        if (got >= 3 && old) src = src == 0 ? 0 : src == 3 ? 2 : -1;
+        if (got >= 3 && src >= 0) mod_route_set_p(h, src, param_index(key), amt, got == 4 ? bip : -1);
         s = strchr(s, ',');
         if (s) s++;
     }
@@ -1873,42 +1950,24 @@ static void mods_block(hm_t *h, int frames)
     h->m_trig = 0;
 
     /* the clock starts: every modulator from the top, so a phrase lines up with the bar */
-    if (trig & 4) { h->m_ph[0] = 0.0; h->m_ph[1] = 1.0; }
-    /* Wave */
-    if ((trig & 1) && P[P_M1_RETRIG] > 0.5f) h->m_ph[0] = 0.0;
-    h->m_ph[0] += (double)(mod_rate_hz(h, P_M1_RATE, P_M1_SYNC) * dt);
-    h->m_ph[0] -= floor(h->m_ph[0]);
-    h->mod[0] = wave_shape(clampi((int)P[P_M1_SHAPE], 0, 4), h->m_ph[0]);
-
-    /* Random: a new value every period; Smooth glides to it over that much of the period */
-    {
-        int step = 0;
-        if ((trig & 1) && P[P_M2_RETRIG] > 0.5f) { h->m_ph[1] = 0.0; step = 1; }
-        h->m_ph[1] += (double)(mod_rate_hz(h, P_M2_RATE, P_M2_SYNC) * dt);
-        if (h->m_ph[1] >= 1.0) { h->m_ph[1] -= floor(h->m_ph[1]); step = 1; }
-        if (step) {                                           /* its own generator: the genes' chance is left alone */
-            uint32_t x = h->m_rng ? h->m_rng : 0x1234567u; x ^= x << 13; x ^= x >> 17; x ^= x << 5; h->m_rng = x;
-            h->m_rfrom = h->m_rcur; h->m_rtgt = (float)(x >> 8) * (2.0f / 16777216.0f) - 1.0f;
+    if (trig & 4) { h->m_ph[0] = 0.0; h->m_ph[1] = 0.0; }
+    /* LFO 1 and LFO 2 */
+    static const int lp[2][4] = { { P_M1_SHAPE, P_M1_RATE, P_M1_SYNC, P_M1_RETRIG }, { P_M2_SHAPE, P_M2_RATE, P_M2_SYNC, P_M2_RETRIG } };
+    for (int l = 0; l < 2; l++) {
+        if ((trig & 1) && P[lp[l][3]] > 0.5f) h->m_ph[l] = 1.0;            /* restart: a new cycle (and a new random value) now */
+        h->m_ph[l] += (double)(mod_rate_hz(h, lp[l][1], lp[l][2]) * dt);
+        if (h->m_ph[l] >= 1.0) {
+            h->m_ph[l] -= floor(h->m_ph[l]);
+            uint32_t x = h->m_rng ? h->m_rng : 0x1234567u; x ^= x << 13; x ^= x >> 17; x ^= x << 5; h->m_rng = x;   /* its own generator */
+            h->lfo_rnd[l][0] = h->lfo_rnd[l][1];
+            h->lfo_rnd[l][1] = (float)(x >> 8) * (2.0f / 16777216.0f) - 1.0f;
         }
-        const float sm = P[P_M2_SMOOTH];
-        if (sm < 0.01f) h->m_rcur = h->m_rtgt;
-        else {
-            float u = clampf((float)h->m_ph[1] / sm, 0.0f, 1.0f);
-            u = u * u * (3.0f - 2.0f * u);
-            h->m_rcur = h->m_rfrom + (h->m_rtgt - h->m_rfrom) * u;
-        }
-        h->mod[1] = h->m_rcur;
-    }
-
-    /* Follow: peak level of the last block, through attack / release */
-    {
-        const float lv = (int)P[P_M3_SRC] ? h->blk_out_pk : h->blk_in_pk;
-        const float g = powf(10.0f, (-6.0f + 36.0f * P[P_M3_GAIN]) / 20.0f);
-        const float x = clampf(lv * g, 0.0f, 1.0f);
-        const float ta = 0.001f * powf(1000.0f, P[P_M3_ATK]), tr = 0.01f * powf(300.0f, P[P_M3_REL]);
-        const float k = 1.0f - expf(-dt / (x > h->m_env ? ta : tr));
-        h->m_env += (x - h->m_env) * k;
-        h->mod[2] = h->m_env;
+        const int shape = clampi((int)P[lp[l][0]], 0, 6);
+        if (shape == 5) h->mod[l] = h->lfo_rnd[l][1];                                            /* steps */
+        else if (shape == 6) {                                                                    /* glides */
+            const float u = (float)h->m_ph[l], sm = u * u * (3.0f - 2.0f * u);
+            h->mod[l] = h->lfo_rnd[l][0] + (h->lfo_rnd[l][1] - h->lfo_rnd[l][0]) * sm;
+        } else h->mod[l] = wave_shape(shape, h->m_ph[l]);
     }
 
     /* Envelope: linear attack, exponential-looking decay (or hold while a pad is down) */
@@ -1927,7 +1986,7 @@ static void mods_block(hm_t *h, int frames)
                 if (h->m_el <= 0.0f) { h->m_el = 0.0f; h->m_es = mode == 2 ? 1 : 0; }
             }
         }
-        h->mod[3] = h->m_el * h->m_el;
+        h->mod[2] = h->m_el * h->m_el;
     }
 
     /* routes: every target starts from its knob, then each route adds to it */
@@ -1938,8 +1997,8 @@ static void mods_block(hm_t *h, int frames)
         const int sx = h->mr[r].src;
         float m = h->mod[sx];
         const int native = mod_default_bip(sx);
-        if (h->mr[r].bip && !native) m = 2.0f * m - 1.0f;          /* Follow / Envelope made to swing */
-        else if (!h->mr[r].bip && native) m = 0.5f * (m + 1.0f);   /* Wave / Random made to push one way */
+        if (h->mr[r].bip && !native) m = 2.0f * m - 1.0f;          /* the Envelope made to swing */
+        else if (!h->mr[r].bip && native) m = 0.5f * (m + 1.0f);   /* an LFO made to push one way */
         h->p[t] += h->mr[r].amt * m * (d->max - d->min);
     }
     for (int r = 0; r < h->n_mr; r++) {
@@ -1956,13 +2015,16 @@ static void mods_block(hm_t *h, int frames)
 static void apply_state_json(hm_t *h, const char *val)
 {
     float f;
-    const int full = strstr(val, "\"sample_path\"") != NULL;
+    const int patch = strstr(val, "\"patch\"") != NULL;
+    const int full = strstr(val, "\"sample_path\"") != NULL || patch;   /* a patch sets every control of the sound too */
     for (int i = 0; i < P_COUNT; i++) {
+        if (patch && param_is_global(i)) continue;
         if (json_num(val, g_params[i].key, &f) == 0) set_param_value(h, i, f);
         else if (full) set_param_value(h, i, g_params[i].def);
     }
     char routes[HM_MAX_ROUTES * 72];
-    if (json_str(val, "mod_routes", routes, sizeof routes) == 0) mod_routes_parse(h, routes);
+    if (json_str(val, "mod_routes2", routes, sizeof routes) == 0) mod_routes_parse(h, routes, 0);
+    else if (json_str(val, "mod_routes", routes, sizeof routes) == 0) mod_routes_parse(h, routes, 1);
     else if (full) mod_routes_clear(h, -1);
     char path[HM_PATH_MAX];
     if (json_str(val, "sample_path", path, sizeof path) == 0 && strcmp(path, h->cur_path) != 0) request_load(h, path);
@@ -2823,8 +2885,9 @@ static void hm_render(hm_t *h, int16_t *out, int frames)
             uint32_t w;
             wl = clampf(wl, -1.0f, 1.0f); wr = clampf(wr, -1.0f, 1.0f);
             h->rec_t++;
-            const int skipw = h->rec_skip > 0;                  /* Trim Key Noise: the press is not written */
-            if (skipw) h->rec_skip--;
+            if (h->rec_wait_key && ++h->rec_wait_t > (int)(1.5f * sr)) { h->rec_wait_key = 0; h->rec_skip = key_trim_frames(h); }   /* never let go: go on */
+            const int skipw = h->rec_skip > 0 || h->rec_wait_key;   /* Trim Key Noise: the press and the release are not written */
+            if (h->rec_skip) h->rec_skip--;
             if (h->rec_mode == REC_NEW) {
                 if (h->rec_pos >= reel->cap || (h->rec_target && h->rec_pos - h->rec_start >= h->rec_target)) {
                     rec_end(h);
@@ -2832,26 +2895,6 @@ static void hm_render(hm_t *h, int16_t *out, int frames)
                 }
                 if (skipw) goto recorded;
                 w = h->rec_pos;
-            } else if (h->p[P_REC_HEAD] > 0.5f) {
-                /* Overdub Head = Vari-Speed: the write head runs with the tape,
-                   faster, slower, backwards or not at all; every frame it
-                   passes gets the sound of this moment */
-                const double L = (double)(h->rec_len ? h->rec_len : 1);
-                const double p0 = h->rec_fpos, p1 = p0 + (double)speed;
-                const long k0 = (long)floor(p0), k1 = (long)floor(p1);
-                if (k1 != k0) {
-                    const long d = k1 > k0 ? 1 : -1;
-                    for (long k = k0 + d; !skipw; k += d) {
-                        long q = k % (long)L; if (q < 0) q += (long)L;
-                        ring_push(h, reel, h->rec_lo + (uint32_t)q);
-                        reel->l[h->rec_lo + (uint32_t)q] = wl;
-                        reel->r[h->rec_lo + (uint32_t)q] = wr;
-                        if (k == k1) break;
-                    }
-                }
-                h->rec_fpos = p1 - L * floor(p1 / L);
-                h->rec_pos = (uint32_t)h->rec_fpos;
-                goto recorded;
             } else {
                 if (skipw) { h->rec_pos++; goto recorded; }
                 w = h->rec_lo + (h->rec_pos % (h->rec_len ? h->rec_len : 1));
@@ -2899,7 +2942,8 @@ static void *v2_create_instance(const char *module_dir, const char *json_default
     h->sr = (g_host && g_host->sample_rate > 0) ? (float)g_host->sample_rate : 44100.0f;
     h->rng = 0x2545F491u;
     h->ring = calloc(HM_RING, sizeof *h->ring);
-    h->gate_g = 1.0f;              /* without it, overdubs just keep their last frames */
+    h->gate_g = 1.0f;
+    h->patch_buf = (char *)calloc(HM_STATE_MAX, 1);              /* without it, overdubs just keep their last frames */
     h->sel_override = -1;
     h->view_b = 0;
     for (int i = 0; i < P_COUNT; i++) h->p[i] = h->base[i] = g_params[i].def;
@@ -2944,6 +2988,7 @@ static void v2_destroy_instance(void *instance)
     for (int i = 0; i < h->undo_n; i++) free_reel(h->undo[i].reel);
     free_reel(atomic_exchange(&h->trim_out, NULL));
     free(h->ring);
+    free(h->patch_buf);
     free(h);
 }
 
@@ -3000,12 +3045,12 @@ static void v2_set_param(void *instance, const char *key, const char *val)
     if (strcmp(key, "all_notes_off") == 0) { all_notes_off(h); return; }
 
     /* editing and transport commands (used by the on-screen UI) */
-    if (strcmp(key, "rec_cur") == 0)  { rec_request(h, REC_CUR); return; }
-    if (strcmp(key, "rec_new") == 0)  { rec_request(h, REC_NEW); return; }
+    if (strcmp(key, "rec_cur") == 0)  { rec_request(h, REC_CUR, strcmp(val, "key") == 0); return; }
+    if (strcmp(key, "rec_new") == 0)  { rec_request(h, REC_NEW, strcmp(val, "key") == 0); return; }
     if (strcmp(key, "rec_stop") == 0) { rec_stop_request(h); return; }
     if (strcmp(key, "hd_clear") == 0) { h->hd.clear_req = 1; return; }
-    if (strcmp(key, "rec_toggle") == 0) { if (h->rec_mode || h->rec_armed) rec_stop_request(h); else rec_request(h, REC_CUR); return; }
-    if (strcmp(key, "rec_toggle_new") == 0) { if (h->rec_mode || h->rec_armed) rec_stop_request(h); else rec_request(h, REC_NEW); return; }
+    if (strcmp(key, "rec_toggle") == 0) { if (h->rec_mode || h->rec_armed) rec_stop_request(h); else rec_request(h, REC_CUR, strcmp(val, "key") == 0); return; }
+    if (strcmp(key, "rec_toggle_new") == 0) { if (h->rec_mode || h->rec_armed) rec_stop_request(h); else rec_request(h, REC_NEW, strcmp(val, "key") == 0); return; }
     if (strcmp(key, "marker_add") == 0) {
         uint32_t pos;
         if (strcmp(val, "play") == 0) {                                        /* at the playhead of the newest gene */
@@ -3061,6 +3106,32 @@ static void v2_set_param(void *instance, const char *key, const char *val)
     if (strcmp(key, "mod_set") == 0) {                                      /* "source key amount" */
         int src; char k[64]; float amt;
         if (sscanf(val, "%d %63s %f", &src, k, &amt) == 3) mod_route_set(h, src, param_index(k), amt);
+        return;
+    }
+    if (strcmp(key, "patch_save") == 0 || strcmp(key, "init") == 0) {   /* "1".."16"; Init first keeps the sound in slot 0 */
+        const int init = key[0] == 'i';
+        const int slot = init ? 0 : atoi(val);
+        if (slot < 0 || slot > 16 || !h->patch_buf) return;
+        if (atomic_load(&h->patch_op) == 0) {
+            build_patch_json(h, h->patch_buf, HM_STATE_MAX);
+            h->patch_slot = slot;
+            atomic_store_explicit(&h->patch_op, 1, memory_order_release);
+        }
+        if (init) {
+            for (int i = 0; i < P_COUNT; i++) if (!param_is_global(i)) set_param_value(h, i, g_params[i].def);
+            mod_routes_clear(h, -1);
+        }
+        return;
+    }
+    if (strcmp(key, "patch_load") == 0) {
+        const int slot = atoi(val);
+        if (slot < 0 || slot > 16 || atomic_load(&h->patch_op)) return;
+        h->patch_slot = slot;
+        atomic_store_explicit(&h->patch_op, 2, memory_order_release);
+        return;
+    }
+    if (strcmp(key, "rec_key_up") == 0) {               /* the record key is let go: from now, skip only the trim */
+        if (h->rec_wait_key) { h->rec_wait_key = 0; h->rec_skip = key_trim_frames(h); }
         return;
     }
     if (strcmp(key, "mod_pol") == 0) {                                      /* "source key": both ways <-> one way */
@@ -3137,10 +3208,9 @@ static int get_ui_state(hm_t *h, char *buf, int buf_len)
         const int pl = k_pattern_len[clampi((int)h->p[P_PATTERN], 0, 9)];
         jb_add(&j, ",\"rtg\":%u,\"rdn\":%u,\"pi\":%u", h->rec_mode == REC_NEW ? h->rec_target : 0u,
                h->rec_mode == REC_NEW ? h->rec_pos - h->rec_start : 0u, pl ? h->pat_i % (uint32_t)pl : 0u);
-        jb_add(&j, ",\"tmp\":%d", h->temp_on);
+        jb_add(&j, ",\"tmp\":%d,\"pv\":%u,\"pbusy\":%d", h->temp_on, atomic_load(&h->patch_ver), atomic_load(&h->patch_op) != 0);
         jb_add(&j, ",\"ton\":%d,\"ta\":%u,\"tb\":%u,\"tjb\":%d", h->trim_on, h->trim_a, h->trim_b, atomic_load(&h->tj_state) != 0);
-        jb_add(&j, ",\"mrv\":%u,\"mo\":[%.3f,%.3f,%.3f,%.3f]", h->mr_ver,
-               (double)h->mod[0], (double)h->mod[1], (double)h->mod[2], (double)h->mod[3]);
+        jb_add(&j, ",\"mrv\":%u,\"mo\":[%.3f,%.3f,%.3f]", h->mr_ver, (double)h->mod[0], (double)h->mod[1], (double)h->mod[2]);
     }
     jb_add(&j, ",\"gp\":[");
     int first = 1;
@@ -3269,7 +3339,9 @@ static int get_remote_state(hm_t *h, char *buf, int buf_len)
         jb_add(&j, "%s%u", first ? "" : ",", (uint32_t)((double)g->lo + rel));
         first = 0;
     }
-    jb_add(&j, "\",\"v_mo\":\"%.3f,%.3f,%.3f,%.3f\"", (double)h->mod[0], (double)h->mod[1], (double)h->mod[2], (double)h->mod[3]);
+    jb_add(&j, "\",\"v_mo\":\"%.3f,%.3f,%.3f\",\"v_mph\":\"%.3f,%.3f\"", (double)h->mod[0], (double)h->mod[1], (double)h->mod[2],
+           h->m_ph[0], h->m_ph[1]);
+    jb_add(&j, ",\"v_pat\":\"%s\",\"v_pv\":%u", h->patch_list, atomic_load(&h->patch_ver));   /* the slots that hold a patch */
     jb_add(&j, ",\"v_pk\":\"%s\"}", rui_peaks(h));
     return j.ovf ? -1 : j.len;
 }
@@ -3283,6 +3355,7 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
     if (strcmp(key, "ui_state") == 0)     return get_ui_state(h, buf, buf_len);
     if (strcmp(key, "view_peaks") == 0)   return get_view_peaks(h, buf, buf_len);
     if (strcmp(key, "markers") == 0)      return get_markers_csv(h, buf, buf_len);
+    if (strcmp(key, "patches") == 0)      return snprintf(buf, (size_t)buf_len, "%s", h->patch_list);
     if (strcmp(key, "mod_routes") == 0) {
         jb_t j = { buf, buf_len, 0, 0 };
         buf[0] = 0;

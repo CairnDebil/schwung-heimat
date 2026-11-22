@@ -1,0 +1,10 @@
+# keys retired in 0.15.0
+mod_follow_attack
+mod_follow_gain
+mod_follow_release
+mod_follow_src
+mod_rand_rate
+mod_rand_retrig
+mod_rand_smooth
+mod_rand_sync
+rec_head

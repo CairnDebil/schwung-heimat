@@ -127,23 +127,18 @@ const PD = {
     pattern_seed: { t: 'i', min: 1, max: 999, lab: 'SEED', name: 'Pattern Seed' },
     rec_length:  { t: 'e', opts: ['FREE', '1 BAR', '2 BARS', '4 BARS', '8 BARS', '16 BARS'], lab: 'LEN', name: 'Record Length' },
     rec_after:   { t: 'e', opts: ['PLAY', 'OVERDUB'], lab: 'AFTR', name: 'After Recording' },
-    rec_head:    { t: 'e', opts: ['STEADY', 'VARI'], lab: 'HEAD', name: 'Overdub Head' },
     rec_trim:    { t: 'e', opts: ['OFF', '50MS', '100MS', '200MS', '300MS', '500MS'], lab: 'KEYS', name: 'Trim Key Noise' },
     filter:      { t: 'f', min: -1, max: 1, lab: 'FILT', name: 'Filter' },
     mod_restart: { t: 'e', opts: ['OFF', 'ON'], lab: 'MRST', name: 'Restart Mods On Clock' },
     in_gate:     { t: 'e', opts: ['OFF', '-70DB', '-60DB', '-50DB', '-40DB'], lab: 'GATE', name: 'Input Gate' },
-    mod_wave_shape: { t: 'e', opts: ['SINE', 'TRI', 'UP', 'DOWN', 'SQR'], lab: 'SHP', name: 'Wave Shape' },
-    mod_wave_rate:  { t: 'f', min: 0, max: 1, lab: 'RATE', name: 'Wave Rate' },
-    mod_wave_sync:  { t: 'e', opts: ['FREE', '4BAR', '2BAR', '1BAR', '1/2', '1/4', '1/8', '1/16'], lab: 'SYNC', name: 'Wave Sync' },
-    mod_wave_retrig: { t: 'e', opts: ['OFF', 'ON'], lab: 'RST', name: 'Wave Restart On Pads' },
-    mod_rand_rate:  { t: 'f', min: 0, max: 1, lab: 'RATE', name: 'Random Rate' },
-    mod_rand_smooth: { t: 'f', min: 0, max: 1, lab: 'SMTH', name: 'Random Smooth' },
-    mod_rand_sync:  { t: 'e', opts: ['FREE', '4BAR', '2BAR', '1BAR', '1/2', '1/4', '1/8', '1/16'], lab: 'SYNC', name: 'Random Sync' },
-    mod_rand_retrig: { t: 'e', opts: ['OFF', 'ON'], lab: 'RST', name: 'Random On Pads' },
-    mod_follow_src: { t: 'e', opts: ['INPUT', 'OUTPUT'], lab: 'SRC', name: 'Follow Source' },
-    mod_follow_gain: { t: 'f', min: 0, max: 1, lab: 'GAIN', name: 'Follow Gain' },
-    mod_follow_attack: { t: 'f', min: 0, max: 1, lab: 'RISE', name: 'Follow Attack' },
-    mod_follow_release: { t: 'f', min: 0, max: 1, lab: 'FALL', name: 'Follow Release' },
+    mod_wave_shape: { t: 'e', opts: ['SINE', 'TRI', 'UP', 'DOWN', 'SQR', 'RAND', 'SMTH'], lab: 'SHP', name: 'LFO 1 Shape' },
+    mod_wave_rate:  { t: 'f', min: 0, max: 1, lab: 'RATE', name: 'LFO 1 Rate' },
+    mod_wave_sync:  { t: 'e', opts: ['FREE', '4BAR', '2BAR', '1BAR', '1/2', '1/4', '1/8', '1/16'], lab: 'SYNC', name: 'LFO 1 Sync' },
+    mod_wave_retrig: { t: 'e', opts: ['OFF', 'ON'], lab: 'RST', name: 'LFO 1 Restart On Pads' },
+    mod_lfo2_shape: { t: 'e', opts: ['SINE', 'TRI', 'UP', 'DOWN', 'SQR', 'RAND', 'SMTH'], lab: 'SHP', name: 'LFO 2 Shape' },
+    mod_lfo2_rate:  { t: 'f', min: 0, max: 1, lab: 'RATE', name: 'LFO 2 Rate' },
+    mod_lfo2_sync:  { t: 'e', opts: ['FREE', '4BAR', '2BAR', '1BAR', '1/2', '1/4', '1/8', '1/16'], lab: 'SYNC', name: 'LFO 2 Sync' },
+    mod_lfo2_retrig: { t: 'e', opts: ['OFF', 'ON'], lab: 'RST', name: 'LFO 2 Restart On Pads' },
     mod_env_attack: { t: 'f', min: 0, max: 1, lab: 'ATK', name: 'Envelope Attack' },
     mod_env_decay:  { t: 'f', min: 0, max: 1, lab: 'DCY', name: 'Envelope Decay' },
     mod_env_mode:   { t: 'e', opts: ['AD', 'HOLD', 'LOOP'], lab: 'MODE', name: 'Envelope Mode' },
@@ -158,9 +153,9 @@ const DEFAULTS = {
     rev_mix: 0, rev_size: 0.5, rev_predelay: 20, rev_reverse: 0, rev_decay: 0.5, rev_damp: 0.4, rev_tilt: 0, rev_depth: 0, rev_speed: 0.35, fx_rec: 0,
     hd_mix: 0, hd_time: 7, hd_heads: 2, hd_spacing: 0.3, hd_fdbk: 0.45, hd_reverse: 0, hd_wear: 0, hd_wear_amt: 0, hd_mode: 0, hd_route: 0, hd_freeze: 0,
     spread_mode: 0, gene_reverse: 0,
-    pattern: 0, pattern_seed: 1, rec_length: 0, rec_after: 0, rec_head: 0,
-    mod_wave_shape: 0, mod_wave_rate: 0.4, mod_wave_sync: 0, mod_wave_retrig: 0, mod_rand_rate: 0.4, mod_rand_smooth: 0,
-    mod_rand_sync: 0, mod_rand_retrig: 0, mod_follow_src: 0, mod_follow_gain: 0.5, mod_follow_attack: 0.1, mod_follow_release: 0.4,
+    pattern: 0, pattern_seed: 1, rec_length: 0, rec_after: 0,
+    mod_wave_shape: 0, mod_wave_rate: 0.4, mod_wave_sync: 0, mod_wave_retrig: 0,
+    mod_lfo2_shape: 1, mod_lfo2_rate: 0.25, mod_lfo2_sync: 0, mod_lfo2_retrig: 0,
     mod_env_attack: 0.1, mod_env_decay: 0.4, mod_env_mode: 0, mod_env_trigger: 0, rec_trim: 0, in_gate: 2, filter: 0, mod_restart: 0,
 };
 
@@ -170,10 +165,10 @@ const PAGES = {
     reel:  ['@splice', '@start', '@end', '@zoom', '@sens', '@divide', 'gene_size', 'slide'],
     rec:   ['sos', 'in_gain', 'rec_source', 'rec_sync', 'clock_source', 'bpm', 'clock_div', 'clock_mode'],
     mod: [
-        ['mod_wave_shape', 'mod_wave_rate', 'mod_wave_sync', 'mod_wave_retrig', 'mod_rand_rate', 'mod_rand_smooth', 'mod_rand_sync', 'mod_rand_retrig'],
-        ['mod_follow_src', 'mod_follow_gain', 'mod_follow_attack', 'mod_follow_release', 'mod_env_attack', 'mod_env_decay', 'mod_env_mode', 'mod_env_trigger'],
+        ['mod_wave_shape', 'mod_wave_rate', 'mod_wave_sync', 'mod_wave_retrig', 'mod_lfo2_shape', 'mod_lfo2_rate', 'mod_lfo2_sync', 'mod_lfo2_retrig'],
+        ['mod_env_attack', 'mod_env_decay', 'mod_env_mode', 'mod_env_trigger', 'mod_restart', null, null, null],
     ],
-    loop:  ['rec_length', 'rec_after', 'rec_head', 'rec_trim', 'rec_sync', 'sos', 'bpm', 'in_gate'],
+    loop:  ['rec_length', 'rec_after', 'rec_trim', 'rec_sync', 'sos', 'rec_source', 'bpm', 'in_gate'],
     setup: [
         ['gene_window', 'scatter', 'spread', 'width', 'threshold', 'thr_mode', 'spread_mode', 'gene_reverse'],
         ['pattern', 'pattern_seed', 'scatter', 'spread', 'spread_mode', 'gene_reverse', 'width', 'gene_window'],
@@ -183,7 +178,7 @@ const PAGES = {
         ['rev_mix', 'rev_size', 'rev_predelay', 'rev_decay', 'rev_damp', 'rev_depth', 'rev_speed', 'rev_tilt'],
         ['rev_reverse', 'rev_predelay', 'rev_size', 'rev_decay', 'rev_damp', 'rev_tilt', 'rev_mix', 'fx_rec'],
         ['pad_mode', 'play_mode', 'root_note', 'octave_transpose', 'splice_base', 'organize_mode', 'bend_range', 'release_ms'],
-        ['splice_source', 'divide', 'mcr1', 'mcr2', 'mcr3', 'save_48k', 'mute', 'mod_restart'],
+        ['splice_source', 'divide', 'mcr1', 'mcr2', 'mcr3', 'save_48k', 'mute', 'volume'],
     ],
 };
 const VIRT = {
@@ -192,12 +187,31 @@ const VIRT = {
     '@sens': { lab: 'SENS', name: 'Detect Sensitivity' }, '@divide': { lab: 'DIV', name: 'Divide Equal' },
 };
 const PAGE_NAMES = { play: 'PLAY', reel: 'REEL', rec: 'REC', setup: 'SETUP' };
-/* Track 4 cycles MICRO, MICRO 2, EQ, HEADS, HEADS 2, REVERB, REVERB 2, SETUP 1,
- * SETUP 2: one page (or a pair) for each effect. Track 3 again on REC: LOOP. */
-const SETUP_NAMES = ['MICRO', 'MICRO 2', 'EQ', 'HEADS', 'HEADS 2', 'REVERB', 'REVERB 2', 'SETUP', 'SETUP'];
+/* Each Track button opens its first page, pressed again the next:
+ * Track 1 PLAY, MICRO, MICRO 2 · Track 2 REEL, SETUP 1, SETUP 2 ·
+ * Track 3 REC, LOOP · Track 4 EQ, HEADS, HEADS 2, REVERB, REVERB 2.
+ * The 'setup' pages are numbered as in SETUP_NAMES. */
+const SETUP_NAMES = ['MICRO', 'MICRO 2', 'EQ', 'HEADS', 'HEADS 2', 'REVERB', 'REVERB 2', 'SETUP 1', 'SETUP 2'];
 const MICRO2_PAGE = 1, EQ_PAGE = 2, HEADS_PAGE = 3, REVERB_PAGE = 5, SETUP_FIRST = 7;
+const TRACK_VIEWS = [
+    [['play', 0], ['setup', 0], ['setup', 1]],
+    [['reel', 0], ['setup', 7], ['setup', 8]],
+    [['rec', 0], ['rec', 1]],
+    [['setup', 2], ['setup', 3], ['setup', 4], ['setup', 5], ['setup', 6]],
+];
+function viewNow() { return [page, page === 'setup' ? setupPage : page === 'rec' ? recPage : 0]; }
+function trackOfView() {
+    const [pg, sub] = viewNow();
+    return TRACK_VIEWS.findIndex((vs) => vs.some(([p, n]) => p === pg && n === sub));
+}
+function setView(pg, sub) {
+    page = pg;
+    if (pg === 'setup') setupPage = sub;
+    if (pg === 'rec') recPage = sub;
+}
 function pageName() {
     if (overlay === 'trim') return 'TRIM';
+    if (overlay === 'patch') return 'PATCH';
     if (page === 'setup') return SETUP_NAMES[setupPage];
     if (page === 'mod') return modPage ? 'MOD 2' : 'MOD 1';
     return page === 'rec' && recPage ? 'LOOP' : PAGE_NAMES[page];
@@ -208,10 +222,10 @@ function pageKeys() {
     return page === 'rec' && recPage ? PAGES.loop : PAGES[page];
 }
 
-/* Modulators: Track 1-4 held = Wave, Random, Follow, Envelope. Holding one and
+/* Modulators: Track 1-3 held = LFO 1, LFO 2, Envelope. Holding one and
  * turning a knob sets how much that source moves the knob's control; the
  * cells of modulated controls carry a mark. */
-const MOD_NAMES = ['WAVE', 'RAND', 'FOLW', 'ENV'];
+const MOD_NAMES = ['LFO1', 'LFO2', 'ENV'];
 let routes = [];                               /* [{k, s, a}] from the DSP */
 let lastMrv = -1;
 let trackHold = null;                          /* {n, used} while a Track button is down */
@@ -232,7 +246,8 @@ function setRoute(src, key, amt) {
     lastLocalEdit = Date.now();
     setParam('mod_set', src + ' ' + key + ' ' + amt.toFixed(2));
     const pct = Math.round(amt * 100);
-    say(MOD_NAMES[src] + ' > ' + PD[key].lab + ' ' + (pct > 0 ? '+' : '') + pct + '%', 900);
+    focus.idx = -1; focus.until = 0;                  /* the depth, not the knob's reading */
+    say(MOD_NAMES[src] + ' > ' + PD[key].lab + ' ' + (pct > 0 ? '+' : '') + pct + '%', 1500);
 }
 /* where the modulation has taken each modulated control right now (from the DSP) */
 let liveVals = {};
@@ -267,7 +282,10 @@ let markers = [];
 let peaks = '';
 let peaksKey = '';
 let page = 'play', setupPage = 0, recPage = 0, modPage = 0;
-let overlay = null;                           /* null | 'menu' | 'browser' | 'about' | 'trim' */
+let overlay = null;                           /* null | 'menu' | 'browser' | 'about' | 'trim' | 'patch' */
+let patchUi = null;                           /* {save, cursor, confirm} while choosing a patch slot */
+let menuConfirm = -1;                         /* a menu line waiting for its second click */
+let lastPv = -1, patchUsed = new Set();
 let menuCursor = 0;
 let shiftHeld = false;
 const touched = new Array(8).fill(false);
@@ -334,6 +352,7 @@ function pollDsp(now) {
     }
     if (S.mrv !== undefined && S.mrv !== lastMrv && now - lastLocalEdit > 600) { lastMrv = S.mrv; readRoutes(); }
     readLive();
+    if (S.pv !== undefined && S.pv !== lastPv) { lastPv = S.pv; readPatches(); }
     if (S.mv !== lastMv) {
         lastMv = S.mv;
         const csv = getParam('markers');
@@ -421,16 +440,13 @@ function fmtParam(key) {
         const fc = v < 0 ? 20000 * Math.pow(2, -9 * ax) : 20 * Math.pow(2, 9 * ax);
         return (v < 0 ? 'LP ' : 'HP ') + (fc >= 1000 ? (fc / 1000).toFixed(fc >= 10000 ? 0 : 1) + 'k' : Math.round(fc));
     }
-    if (key === 'mod_wave_rate' || key === 'mod_rand_rate') {
-        const sy = P[key === 'mod_wave_rate' ? 'mod_wave_sync' : 'mod_rand_sync'] | 0;
+    if (key === 'mod_wave_rate' || key === 'mod_lfo2_rate') {
+        const sy = P[key === 'mod_wave_rate' ? 'mod_wave_sync' : 'mod_lfo2_sync'] | 0;
         if (sy) return PD.mod_wave_sync.opts[sy];
         const hz = 0.02 * Math.pow(1000, v);
         return (hz < 1 ? hz.toFixed(2) : hz.toFixed(1)) + 'Hz';
     }
-    if (key === 'mod_follow_attack') return fmtMs(1000 * 0.001 * Math.pow(1000, v));
-    if (key === 'mod_follow_release') return fmtMs(1000 * 0.01 * Math.pow(300, v));
     if (key === 'mod_env_attack' || key === 'mod_env_decay') return fmtMs(1000 * 0.001 * Math.pow(5000, v));
-    if (key === 'mod_follow_gain') return (v * 36 - 6 > 0 ? '+' : '') + Math.round(v * 36 - 6) + 'dB';
     if (key === 'gene_size') return S.gms !== undefined ? fmtMs(S.gms) : v.toFixed(2);
     if (key === 'spread') return v.toFixed(1) + 'st';
     if (key === 'threshold') return Math.round(-60 + 60 * v) + 'dB';
@@ -569,6 +585,7 @@ function drawCells() {
     for (let i = 0; i < 8; i++) {
         const key = keys[i], col = i % 4, row = Math.floor(i / 4);
         const x = col * 32, y = CELL_Y + row * (CELL_H + 1);
+        if (!key) continue;                        /* an empty cell: this knob does nothing here */
         const virt = key[0] === '@';
         const lab = virt ? VIRT[key].lab : PD[key].lab;
         const hot = touched[i];
@@ -658,7 +675,7 @@ function drawMessage() {
 function drawDeleteHold() {
     const frac = Math.min(1, (Date.now() - deleteDown.t) / deleteDown.hold);
     clearStrip();
-    const s = deleteDown.shift ? 'HOLD: CLEAR REEL' : 'HOLD: CLEAR MARKERS';
+    const s = 'HOLD: CLEAR REEL';
     txt(Math.floor((W - tw(s)) / 2), CELL_Y + 2, s);
     meter(4, CELL_Y + 13, W - 8, 5, frac);
 }
@@ -707,7 +724,7 @@ function drawRec() {
 }
 
 /* LOOP: the looper side of recording. A fixed length shows how much of it is
- * done; what happens at the end and how the overdub head moves are spelled out */
+ * done; what happens at the end, and the key-noise trim are spelled out */
 function drawLoop() {
     const bars = [0, 1, 2, 4, 8, 16][P.rec_length | 0];
     let state = bars ? fmtParam('rec_length') : 'FREE LENGTH';
@@ -724,7 +741,7 @@ function drawLoop() {
     } else {
         txt(1, 21, 'THEN ' + (P.rec_after ? 'OVERDUB' : 'PLAY'));
     }
-    txt(1, 30, 'HEAD ' + (P.rec_head ? 'VARI ' + fmtParam('vari_speed') : 'STEADY'));
+    txt(1, 30, 'KEY TRIM ' + fmtParam('rec_trim'));
     drawCells();
 }
 
@@ -766,16 +783,17 @@ function drawMicro() {
     drawCells();
 }
 
-/* MOD 1 (Wave, Random) and MOD 2 (Follow, Envelope): each source as a moving
- * trace, with how many controls it drives */
-const modHist = [[], [], [], []];
+/* MOD 1 (LFO 1, LFO 2) and MOD 2 (Envelope): each source as a moving trace,
+ * with how many controls it drives */
+const modHist = [[], [], []];
 function sampleMods() {
-    const mo = S.mo || [0, 0, 0, 0];
-    for (let m = 0; m < 4; m++) { modHist[m].push(+mo[m] || 0); if (modHist[m].length > 60) modHist[m].shift(); }
+    const mo = S.mo || [0, 0, 0];
+    for (let m = 0; m < 3; m++) { modHist[m].push(+mo[m] || 0); if (modHist[m].length > 60) modHist[m].shift(); }
 }
 function drawMod() {
-    for (let c = 0; c < 2; c++) {
-        const m = modPage * 2 + c, x0 = c * 64, bip = m < 2;
+    const show = modPage ? [2] : [0, 1];
+    for (let c = 0; c < show.length; c++) {
+        const m = show[c], x0 = c * 64, bip = m < 2;
         const n = routes.filter((r) => r.s === m).length;
         txt(x0 + 1, 12, MOD_NAMES[m]);
         const tag = n ? '>' + n : '';
@@ -789,6 +807,11 @@ function drawMod() {
             if (prev === null) px(x, y); else vline(x, prev, y);
             prev = y;
         }
+    }
+    if (modPage) {                                     /* MOD 2: the Envelope's mode, and what the clock does to the LFOs */
+        txt(66, 12, 'ENV ' + fmtParam('mod_env_mode'));
+        txt(66, 21, 'BY ' + fmtParam('mod_env_trigger'));
+        txt(66, 30, 'RST ' + (P.mod_restart ? 'CLOCK' : 'OFF'));
     }
     drawCells();
 }
@@ -950,8 +973,63 @@ function drawSetup() {
     drawCells();
 }
 
-const MENU = ['Load WAV...', 'New empty reel', 'Save reel', 'Auto-splice', 'Clear all markers', 'Undo', 'Clear heads', 'Trim splice...', 'About / DSP load'];
-const VERSION = '0.14.0';
+const MENU = ['Load WAV...', 'New empty reel', 'Save reel', 'Save patch...', 'Load patch...', 'Init patch', 'Auto-splice',
+    'Clear all markers', 'Undo', 'Clear heads', 'Trim splice...', 'About / DSP load'];
+const M_SAVE_PATCH = 3, M_LOAD_PATCH = 4, M_INIT = 5, M_ABOUT = 11;
+const VERSION = '0.15.0';
+
+/* Patches: the sound (every control but the reel, recording and clock
+ * settings) in sixteen slots. Slot 0 is what played before the last Init. */
+function readPatches() {
+    const raw = getParam('patches');
+    patchUsed = new Set(raw ? raw.split(',').filter((x) => x !== '').map(Number) : []);
+}
+function openPatches(save) {
+    readPatches();
+    patchUi = { save, cursor: save ? 1 : 0, confirm: false };
+    message.until = 0;                                 /* the list has the whole screen */
+    if (!save) {                                   /* loading: start on the first slot that holds something */
+        const first = [...patchUsed].sort((a, b) => a - b).find((n) => n > 0);
+        patchUi.cursor = first !== undefined ? first : patchUsed.has(0) ? 0 : 1;
+    }
+    overlay = 'patch';
+}
+function patchLabel(n) {
+    if (n === 0) return 'BEFORE INIT' + (patchUsed.has(0) ? '' : ' (EMPTY)');
+    return 'PATCH ' + (n < 10 ? '0' : '') + n + (patchUsed.has(n) ? '' : ' (EMPTY)');
+}
+function drawPatches() {
+    fill_rect(0, 10, W, H - 10, 0);
+    const lo = patchUi.save ? 1 : 0, rows = 4;
+    txt(2, 12, patchUi.save ? 'SAVE PATCH TO' : 'LOAD PATCH');
+    hline(0, W - 1, 21);
+    const first = Math.max(lo, Math.min(17 - rows, patchUi.cursor - rows + 1));   /* scrolls only past the fourth line */
+    for (let i = 0; i < rows; i++) {
+        const n = first + i, y = 24 + i * 10;
+        if (n > 16) break;
+        const s = patchLabel(n);
+        if (n === patchUi.cursor) inverse(0, y - 1, W, 10, s, 4); else txt(4, y, s);
+    }
+    if (patchUi.confirm) {
+        clearStrip();
+        const m = 'CLICK AGAIN: REPLACE';
+        txt(Math.floor((W - tw(m)) / 2), CELL_Y + 7, m);
+    }
+}
+function patchClick() {
+    const n = patchUi.cursor;
+    if (S.pbusy) { say('PATCH BUSY, AGAIN', 900); return; }
+    if (patchUi.save) {
+        if (patchUsed.has(n) && !patchUi.confirm) { patchUi.confirm = true; return; }
+        setParam('patch_save', n);
+        say('SAVED PATCH ' + n, 1400);
+    } else {
+        if (!patchUsed.has(n)) { say('SLOT ' + n + ' IS EMPTY', 900); return; }
+        setParam('patch_load', n);
+        say(n ? 'LOADED PATCH ' + n : 'BEFORE INIT BACK', 1400);
+    }
+    overlay = null; patchUi = null;
+}
 
 /* version and the load meter, for beta reports: Heimat's own share of each
  * block's real time (average, recent peak) and the blocks that ran over */
@@ -970,6 +1048,13 @@ function drawAbout() {
 
 function drawMenu() {
     fill_rect(0, 10, W, H - 10, 0);
+    if (menuConfirm === menuCursor) {                 /* Init asks once more */
+        txt(4, 20, 'INIT PATCH?');
+        txt(4, 30, 'CLICK AGAIN: YES');
+        txt(4, 40, 'THE SOUND NOW GOES');
+        txt(4, 48, 'TO BEFORE INIT');
+        return;
+    }
     const rows = 6, first = Math.max(0, Math.min(MENU.length - rows, menuCursor - rows + 1));   /* scrolls past six lines */
     for (let i = first; i < Math.min(MENU.length, first + rows); i++) {
         const y = 12 + (i - first) * 8;
@@ -1000,6 +1085,7 @@ function draw() {
     else if (overlay === 'menu') drawMenu();
     else if (overlay === 'browser') drawBrowser();
     else if (overlay === 'about') drawAbout();
+    else if (overlay === 'patch') drawPatches();
     else if (page === 'play') drawPlay();
     else if (page === 'reel') drawReel();
     else if (page === 'rec') { if (recPage) drawLoop(); else drawRec(); }
@@ -1045,7 +1131,8 @@ function buildLeds() {
         want('n', STEP0 + i, idx < ns ? (idx === sel ? COL.white : spliceCol(idx)) : COL.off);
     }
     /* page buttons */
-    for (let i = 0; i < 4; i++) want('c', ROWS[i], PAGE_ORDER[i] === page && !overlay ? COL.white : COL.dim);
+    const tv = trackOfView();
+    for (let i = 0; i < 4; i++) want('c', ROWS[i], i === tv && !overlay ? COL.white : COL.dim);
     /* transport and edit */
     want('c', MoveRec, S.rec ? (blink || S.stp ? COL.red : COL.off) : (S.arm ? (blink ? COL.orange : COL.off) : COL.dim));
     want('c', MoveSample, S.rec === 1 ? COL.red : COL.grey);
@@ -1244,17 +1331,31 @@ function drawTrim() {
 }
 
 function runMenu(i) {
+    if (i === M_INIT && menuConfirm !== i) { menuConfirm = i; return; }
+    menuConfirm = -1;
     overlay = null;
     if (i === 0) openBrowser(SAMPLES_ROOT);
     else if (i === 1) { setParam('sample_path', ''); say('NEW EMPTY REEL'); }
     else if (i === 2) { setParam('save_reel', 'auto'); say('SAVING...'); }
-    else if (i === 3) { setParam('detect_markers', sens.toFixed(2)); say('LISTENING FOR HITS'); }
-    else if (i === 4) { setParam('markers_clear', 1); say('MARKERS CLEARED'); }
-    else if (i === 5) { setParam('undo', 1); say('UNDO'); }
-    else if (i === 6) { setParam('hd_clear', 1); say('HEADS CLEARED'); }
-    else if (i === 7) openTrim();
-    else if (i === 8) overlay = 'about';
+    else if (i === M_SAVE_PATCH) openPatches(true);
+    else if (i === M_LOAD_PATCH) openPatches(false);
+    else if (i === M_INIT) {
+        setParam('init', 1);
+        for (const k in DEFAULTS) if (PD[k] && !GLOBAL_KEYS.has(k)) P[k] = DEFAULTS[k];
+        routes = [];
+        lastLocalEdit = Date.now();
+        say('INIT: SLOT 0 KEEPS IT', 1800);
+    }
+    else if (i === 6) { setParam('detect_markers', sens.toFixed(2)); say('LISTENING FOR HITS'); }
+    else if (i === 7) { setParam('markers_clear', 1); say('MARKERS CLEARED'); }
+    else if (i === 8) { setParam('undo', 1); say('UNDO'); }
+    else if (i === 9) { setParam('hd_clear', 1); say('HEADS CLEARED'); }
+    else if (i === 10) openTrim();
+    else if (i === M_ABOUT) overlay = 'about';
 }
+/* the controls a patch leaves alone, as in the DSP (param_is_global) */
+const GLOBAL_KEYS = new Set(['splice_source', 'divide', 'splice_base', 'sos', 'in_gain', 'rec_source', 'rec_sync', 'clock_source',
+    'bpm', 'mute', 'save_48k', 'fx_rec', 'rec_length', 'rec_after', 'rec_trim', 'in_gate', 'hd_freeze', 'volume']);
 
 /* a virtual cell: knobs that are not plain DSP parameters */
 function turnVirtual(key, delta) {
@@ -1280,7 +1381,7 @@ function encAccel(i) {
 function turnKnob(i, raw) {
     const key = pageKeys()[i];
     const delta = moveInputFilter.decodeDelta(raw);                  /* detents in this event, signed */
-    if (!delta) return;
+    if (!delta || !key) return;
     tempUsed();
     if (touchPol && touchPol.i === i) touchPol.turned = true;
     if (deleteDown && !deleteDown.fired) { resetToDefault(key, i); return; }
@@ -1328,6 +1429,7 @@ function resetToDefault(key, i) {
 }
 
 function showTouched(i) {
+    if (!pageKeys()[i]) return;
     focus.idx = i; focus.until = Date.now() + FOCUS_TOUCH_MS;
 }
 
@@ -1335,15 +1437,16 @@ function pressButton(cc) {
     if (cc === MoveShift) return;
     if (cc !== MoveUndo) tempUsed();
     const rowIdx = ROWS.indexOf(cc);
-    if (rowIdx >= 0 && overlay === 'trim') cancelTrim();
-    if (rowIdx >= 0 && !shiftHeld && !overlay) { trackHold = { n: rowIdx, used: false }; return; }   /* a page on release, a modulator while held */
+    const fromTrim = rowIdx >= 0 && overlay === 'trim';
+    if (fromTrim) cancelTrim();
+    if (rowIdx >= 0 && rowIdx < 3 && !shiftHeld && !overlay) { trackHold = { n: rowIdx, used: false, first: fromTrim }; return; }   /* a page on release, a modulator while held */
     if (rowIdx >= 0 && shiftHeld && rowIdx === 0) {                  /* Shift + Track 1: MOD, again: MOD 2 */
         if (page === 'mod' && !overlay) modPage ^= 1; else modPage = 0;
         page = 'mod'; overlay = null; focus.idx = -1; peaksKey = '';
         return;
     }
-    if (rowIdx >= 0) { openPage(rowIdx); return; }
-    if (cc === MoveMenu) { if (overlay === 'trim') cancelTrim(); overlay = overlay ? null : 'menu'; menuCursor = 0; return; }
+    if (rowIdx >= 0) { openPage(rowIdx, fromTrim); return; }
+    if (cc === MoveMenu) { if (overlay === 'trim') cancelTrim(); overlay = overlay ? null : 'menu'; menuCursor = 0; menuConfirm = -1; patchUi = null; return; }
     if (overlay === 'trim' && cc === MoveCapture) { applyTrim(); return; }
     if (cc === MoveCapture && shiftHeld && !overlay) { openTrim(); return; }
     if (cc === MoveBack) {
@@ -1354,8 +1457,8 @@ function pressButton(cc) {
         return;
     }
     if (overlay) return;
-    if (cc === MoveRec) setParam(shiftHeld ? 'rec_toggle_new' : 'rec_toggle', 1);
-    else if (cc === MoveSample) setParam('rec_toggle_new', 1);
+    if (cc === MoveRec) setParam(shiftHeld ? 'rec_toggle_new' : 'rec_toggle', 'key');
+    else if (cc === MoveSample) setParam('rec_toggle_new', 'key');
     else if (cc === MoveCapture) dropMarker();
     else if (cc === MoveUndo && shiftHeld) {
         if (tempLatched) { tempLatched = false; setParam('temp', 'end'); say('TEMP: ALL BACK'); }
@@ -1386,26 +1489,27 @@ function pressButton(cc) {
         setParam('mod_clear', trackHold.n);
         say(had ? MOD_NAMES[trackHold.n] + ' ROUTES CLEARED' : MOD_NAMES[trackHold.n] + ': NO ROUTES');
     }
-    else if (cc === MoveDelete) { deleteDown = { t: Date.now(), hold: shiftHeld ? 2000 : 1200, shift: shiftHeld, armed: false, fired: false }; }
+    else if (cc === MoveDelete) { deleteDown = { t: Date.now(), hold: shiftHeld ? 2000 : Infinity, shift: shiftHeld, armed: false, fired: false }; }   /* held alone: a modifier, it clears nothing */
     else if (cc === MoveMainButton) {
         if (page === 'reel') dropMarker();
         else setParam('sel_splice', S.sel | 0);
     }
 }
-function openPage(rowIdx) {
-    let target = PAGE_ORDER[rowIdx];
-    if (target === 'rec' && shiftHeld) { target = 'setup'; setupPage = HEADS_PAGE; }   /* Shift + Track 3: HEADS */
-    else if (target === 'setup' && shiftHeld) setupPage = setupPage === REVERB_PAGE ? EQ_PAGE : REVERB_PAGE;   /* Shift + Track 4: REVERB, again: EQ */
-    else if (target === 'setup' && page === 'setup' && !overlay) setupPage = (setupPage + 1) % PAGES.setup.length;
-    else if (target === 'setup' && page !== 'setup') setupPage = 0;
-    else if (target === 'rec' && page === 'rec' && !overlay) recPage ^= 1;            /* Track 3 again: LOOP, again: REC */
-    else if (target === 'rec') recPage = 0;
+function openPage(rowIdx, first = false) {   /* first: from an overlay, the button's first page */
+    if (shiftHeld && rowIdx === 2) setView('setup', HEADS_PAGE);                                   /* Shift + Track 3: HEADS */
+    else if (shiftHeld && rowIdx === 3) setView('setup', page === 'setup' && setupPage === REVERB_PAGE ? EQ_PAGE : REVERB_PAGE);   /* Shift + Track 4: REVERB, again: EQ */
+    else {
+        const vs = TRACK_VIEWS[rowIdx], [pg, sub] = viewNow();
+        const at = overlay || first ? -1 : vs.findIndex(([p, n]) => p === pg && n === sub);
+        const [np, nn] = vs[(at + 1) % vs.length];                    /* again: the next page of this button */
+        setView(np, nn);
+    }
     focus.idx = -1;
-    page = target;
     overlay = null;
     peaksKey = '';
 }
 function releaseButton(cc) {
+    if (cc === MoveRec || cc === MoveSample) { setParam('rec_key_up', 1); return; }   /* Trim Key Noise counts from here */
     if (cc === MoveUndo && undoHold) {
         const used = undoHold.used;
         undoHold = null;
@@ -1415,13 +1519,13 @@ function releaseButton(cc) {
     }
     const rowIdx = ROWS.indexOf(cc);
     if (rowIdx >= 0 && trackHold && trackHold.n === rowIdx) {
-        const used = trackHold.used;
+        const used = trackHold.used, first = trackHold.first;
         trackHold = null;
-        if (!used) openPage(rowIdx);
+        if (!used) openPage(rowIdx, first);
         return;
     }
     if (cc === MoveDelete && deleteDown) {
-        if (!deleteDown.fired && !deleteDown.used && !overlay) deleteMarker();
+        if (!deleteDown.fired && !deleteDown.used && !overlay && Date.now() - deleteDown.t < 600) deleteMarker();   /* a tap, not a hold */
         deleteDown = null;
     }
 }
@@ -1430,7 +1534,8 @@ function jogTurn(raw) {
     const delta = moveInputFilter.decodeDelta(raw);
     if (!delta) return;
     if (overlay === 'trim') { trimMove(trim.last, delta * trimStep() * 0.25); return; }
-    if (overlay === 'menu') { menuCursor = Math.max(0, Math.min(MENU.length - 1, menuCursor + delta)); return; }
+    if (overlay === 'menu') { menuConfirm = -1; menuCursor = Math.max(0, Math.min(MENU.length - 1, menuCursor + delta)); return; }
+    if (overlay === 'patch') { patchUi.confirm = false; patchUi.cursor = Math.max(patchUi.save ? 1 : 0, Math.min(16, patchUi.cursor + delta)); return; }
     if (overlay === 'browser') { browser.cursor = Math.max(0, Math.min(Math.max(0, browser.items.length - 1), browser.cursor + delta)); return; }
     if (page === 'reel' && frames() > 1) {
         const perPx = Math.max(1, viewWidth() / W);
@@ -1443,6 +1548,7 @@ function jogClick() {
     if (overlay === 'about') { overlay = null; return; }
     if (overlay === 'trim') { applyTrim(); return; }
     if (overlay === 'menu') { runMenu(menuCursor); return; }
+    if (overlay === 'patch') { patchClick(); return; }
     if (overlay === 'browser') {
         const it = browser.items[browser.cursor];
         if (!it) return;
@@ -1494,11 +1600,10 @@ globalThis.tick = function () {
     if (deleteDown && !deleteDown.fired && deleteDown.used) deleteDown.armed = false;
     else if (deleteDown && !deleteDown.fired) {
         const held = now - deleteDown.t;
-        deleteDown.armed = held > 350;
+        deleteDown.armed = held > 350 && deleteDown.shift;
         if (held >= deleteDown.hold) {
             deleteDown.fired = true;
             if (deleteDown.shift) { setParam('sample_path', ''); say('NEW EMPTY REEL'); }
-            else { setParam('markers_clear', 1); say('MARKERS CLEARED'); }
             deleteDown.armed = false;
         }
     }
@@ -1518,7 +1623,7 @@ globalThis.onMidiMessageInternal = function (data) {
         if (d1 >= 0 && d1 <= 7) {
             touched[d1] = on;
             if (on) {
-                showTouched(d1);
+                if (!trackHold && !deleteDown) showTouched(d1);
                 if (deleteDown && !deleteDown.fired && !overlay) resetToDefault(pageKeys()[d1], d1);
                 if (trackHold) touchPol = { i: d1, turned: false };
             } else if (touchPol && touchPol.i === d1) {

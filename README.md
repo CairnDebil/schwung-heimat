@@ -75,21 +75,28 @@ it installs over Heimat Solo and keeps your settings and reels.
   * **Selective** + **Threshold** — play only the genes that are louder (*Loud*) or
     quieter (*Quiet*) than the threshold; the skipped genes keep their place in
     time as silence.
-* **Modulators** (new in 0.11): four sources that move any continuous control
-  on top of where its knob stands. *Wave* (sine, triangle, ramp up, ramp down,
-  square; 0.02 – 20 Hz, or synced from 4 bars to 1/16, optionally restarted by
-  the pads), *Random* (a new value each step, stepped or gliding, free or
-  synced, optionally a new value on each pad), *Follow* (the level of the input
-  or of Heimat's output, with gain, rise and fall) and *Envelope* (attack and
-  decay, or held while a pad is down, or looping; started by the pads, the
-  clock or both). Up to 16 routes, each with a depth from -100% to +100% of the
-  control's range. The knob itself never moves: what you set is what is saved,
-  and the routes are saved with the session (`mod_routes`). Each route swings
-  both ways around the knob or pushes one way (new in 0.14; Wave and Random
-  start both ways, Follow and Envelope one way), and each modulated cell shows
-  a tick where the modulation has taken its control right now. *Restart Mods
-  On Clock* (SETUP 2) starts Wave and Random from the top when the clock
-  starts.
+* **Modulators** (new in 0.11, three sources since 0.15): *LFO 1* and *LFO 2*,
+  each with its own shape (sine, triangle, ramp up, ramp down, square, *Steps* —
+  a new random value each cycle — and *Glide* — the same, gliding from one
+  value to the next), its own rate (0.02 – 20 Hz, or synced from 4 bars to
+  1/16) and its own restart on the pads; and the *Envelope* (attack and decay,
+  or held while a pad is down, or looping; started by the pads, the clock or
+  both). They move any continuous control on top of where its knob stands. Up
+  to 16 routes, each with a depth from -100% to +100% of the control's range.
+  The knob itself never moves: what you set is what is saved, and the routes
+  are saved with the session. Each route swings both ways around the knob or
+  pushes one way (new in 0.14; the LFOs start both ways, the Envelope one way),
+  and each modulated cell shows a tick where the modulation has taken its
+  control right now. *Restart Mods On Clock* (MOD 2) starts both LFOs from the
+  top when the clock starts.
+* **Patches** (new in 0.15, Menu): *Save patch* keeps the sound in one of 16
+  slots — every control and route, but not the reel, the recording settings
+  (SOS, input gain and source, sync, length, key trim, gate, record through
+  FX, 48 kHz), the clock, the volume, Mute or Freeze, which belong to the
+  session. *Load patch* brings it back. *Init patch* sets every control of the
+  sound to where it starts and clears the routes; what played before goes to
+  slot 0, *Before Init*, so a slip is one Load away. Patches are files in
+  Heimat's data folder (`patches/01.json` …), so they survive updates.
 * **DJ filter** (new in 0.14, PLAY knob 6): one knob, last before the output.
   To the left a low-pass from 20 kHz down to 40 Hz, to the right a high-pass
   from 20 Hz up to 10 kHz, nothing in the middle; the resonance grows as it
@@ -145,11 +152,9 @@ it installs over Heimat Solo and keeps your settings and reels.
   recording by itself after 1, 2, 4, 8 or 16 bars at Heimat's tempo (Free:
   when you stop it). *After Recording*: *Play* the new splice, or *Overdub* —
   recording goes straight on over the loop just closed, until you stop it (this
-  also holds when you stop a free-length recording yourself). *Overdub Head*:
-  *Steady* writes at the speed of time, independent of playback; *Vari-Speed*
-  runs the write head with the tape, so an overdub at half speed comes back an
-  octave up, a backwards one plays forwards, and with the tape stopped nothing
-  is written.
+  also holds when you stop a free-length recording yourself). The overdub head
+  writes at the speed of time, independent of playback (the Vari-Speed head
+  of 0.10–0.14 was removed in 0.15).
 * **Trimming** (new in 0.12): *Trim splice* (Menu, or Shift + Capture) keeps
   only part of the selected splice: knob 1 moves the start, knob 2 the end,
   knob 3 zooms on the last point moved, the jog nudges it. While you trim, the
@@ -203,23 +208,26 @@ and the left / right arrows light as reverse / forward windows.
 
 | Control | Action |
 |---|---|
-| **Track 1–4** | Pages: PLAY · REEL (marker editing) · REC / CLOCK (again: LOOP) · MICRO, then MICRO 2, EQ, HEADS, HEADS 2, REVERB, REVERB 2, SETUP 1 and SETUP 2 on further presses of Track 4 |
+| **Track 1** | PLAY, again MICRO, again MICRO 2 (the sound of the genes) |
+| **Track 2** | REEL (marker editing), again SETUP 1, again SETUP 2 (the reel and the instrument) |
+| **Track 3** | REC / CLOCK, again LOOP (recording) |
+| **Track 4** | EQ, then HEADS, HEADS 2, REVERB, REVERB 2 (the effects) |
 | **Shift + Track 4** | Straight to the REVERB page (again: EQ) |
-| **Shift + Track 1** | MOD 1 (Wave, Random), again: MOD 2 (Follow, Envelope) |
-| **Hold Track 1–4 + turn a knob** | Route Wave, Random, Follow or Envelope to that knob's control: the turn sets the depth (Shift for fine steps), back to 0 removes it. Modulated cells carry a flag on their left edge. The page changes only if you let go without turning |
-| **Hold Track 1–4 + Delete** | Remove every route of that modulator |
-| **Hold Track 1–4 + touch a knob** (without turning) | That route swings both ways around the knob, or pushes one way only |
+| **Shift + Track 1** | MOD 1 (LFO 1, LFO 2), again: MOD 2 (Envelope) |
+| **Hold Track 1–3 + turn a knob** | Route LFO 1, LFO 2 or the Envelope to that knob's control: the depth shows as a percentage while you turn (Shift for fine steps), back to 0 removes it. Modulated cells carry a flag on their left edge. The page changes only if you let go without turning |
+| **Hold Track 1–3 + Delete** | Remove every route of that modulator |
+| **Hold Track 1–3 + touch a knob** (without turning) | That route swings both ways around the knob, or pushes one way only |
 | **Hold Undo** | TEMP: change anything (knobs, pads, routes), let go and it all comes back. A plain tap of Undo still undoes |
 | **Shift + Undo** | TEMP stays on until you press Undo again |
-| **Hold Delete + turn or touch a knob** | That control goes back to its starting value |
+| **Hold Delete + turn or touch a knob** | That control goes back to its starting value; held alone, Delete clears nothing |
 | **Shift + Track 3** | Straight to the HEADS page |
 | **Knobs 1–8** | The eight cells of the page. Turn or touch: name and value appear in place of the cells; Shift for fine steps |
-| **Record** | Record over the current splice; again to stop |
+| **Record** | Record over the current splice; again to stop. With Trim Key Noise on, the trim counts from when you let go of the key |
 | **Shift + Record**, **Sample** | Record into a new splice |
 | **Capture** | Drop a splice marker at the playhead (PLAY) or at the cursor (REEL) |
 | **Shift + Capture** | TRIM the selected splice (knob 1 start, knob 2 end, knob 3 zoom; jog click or Capture cuts, Back cancels) |
 | **Jog** | REEL: move the cursor (Shift = fine); click adds a marker. Elsewhere: choose the splice |
-| **Delete** | Tap: delete the marker under the cursor, or join the current splice with the next. Hold 1.2 s: clear all markers. Shift + hold 2 s: new empty reel |
+| **Delete** | Tap: delete the marker under the cursor, or join the current splice with the next. Shift + hold 2 s: new empty reel. (Clear all markers is in the Menu) |
 | **Undo** | Tap: undo the last marker edit, new-splice recording or trim. Hold: TEMP |
 | **Copy** | Auto-splice on transients (sensitivity on the REEL page) |
 | **Steps 1–16** | Select a splice (banks of 16 follow the selection) |
@@ -228,7 +236,7 @@ and the left / right arrows light as reverse / forward windows.
 | **Play** | Play gate on / off |
 | **Loop** | Clock on / off. **Shift + Loop** cycles the source: Internal, Move, MIDI |
 | **Mute** | Mute the output |
-| **Menu** | Load WAV · New empty reel · Save reel · Auto-splice · Clear all markers · Undo · Clear heads · Trim splice · About / DSP load (version, Heimat's share of each audio block, blocks over time) |
+| **Menu** | Load WAV · New empty reel · Save reel · Save patch · Load patch · Init patch (click twice) · Auto-splice · Clear all markers · Undo · Clear heads · Trim splice · About / DSP load (version, Heimat's share of each audio block, blocks over time) |
 | **Shift + Back** | Leave Heimat |
 
 REEL page knobs: **SPLC** (splice), **STRT / END** (move the markers around the
@@ -240,19 +248,22 @@ MICRO page knobs: **ENV**, **SCAT**, **SPRD**, **WIDE**, **THR**, **SEL**, **INT
 MICRO 2: **PATT** (Pattern), **SEED**, then Scatter, Spread, Intervals, Gene
 Reverse, Width and the envelope again, with one box per gene of the cycle.
 
-MOD 1: **SHP**, **RATE**, **SYNC**, **RST** (Wave), then **RATE**, **SMTH**,
-**SYNC**, **RST** (Random), with each source drawn as a moving trace and the
-number of controls it drives. MOD 2: **SRC**, **GAIN**, **RISE**, **FALL**
-(Follow), **ATK**, **DCY**, **MODE**, **TRIG** (Envelope).
+MOD 1: **SHP**, **RATE**, **SYNC**, **RST** for LFO 1, then the same for LFO
+2, with each source drawn as a moving trace and the number of controls it
+drives. MOD 2: **ATK**, **DCY**, **MODE**, **TRIG** (Envelope) and **MRST**
+(Restart Mods On Clock).
 
 LOOP (Track 3 twice): **LEN** (Record Length), **AFTR** (After Recording),
-**HEAD** (Overdub Head), **KEYS** (Trim Key Noise), **SYNC**, **SOS**, **BPM** and
+**KEYS** (Trim Key Noise), **SYNC**, **SOS**, **SRC** (Record Source), **BPM** and
 **GATE** (Input Gate), with the bars filling while you record.
 
-Each effect has its own page. EQ (Track 4 three times): **LOW**, **MID**, **FREQ**,
+SETUP 1 (Track 2 twice) and SETUP 2 (three times): pads, play gate, notes,
+splice source, Divide, the Morph chord, 48 kHz saving, Mute and Volume.
+
+Each effect has its own page. EQ (Track 4): **LOW**, **MID**, **FREQ**,
 **HIGH**, then **MIX** (to the heads), **REV** (to the reverb), **RFX** (record
 through FX) and **VOL**, with the EQ curve. HEADS and HEADS 2 follow. REVERB
-(**Shift + Track 4**, or Track 4 six times): **REV** (mix), **SIZE**, **PRE**,
+(**Shift + Track 4**, or Track 4 four times): **REV** (mix), **SIZE**, **PRE**,
 **DCAY**, **ABSB**, **DPTH**, **SPD**, **TILT**, with the space drawn above.
 REVERB 2: **RVRS**, **PRE**, **SIZE**, **DCAY**, **ABSB**, **TILT**, **REV**,
 **RFX**.
@@ -308,6 +319,11 @@ button opens it in a window of its own, also on a phone.
   it, drag a mark to move it, double-click to add or remove one. Play, Record,
   New splice, Undo, Save, Auto-splice, Divide now and Clear markers are there
   too.
+* The Modulators panel draws each LFO as one cycle of its shape, with a
+  cursor where it is now, and the Envelope as its attack and decay with its
+  level. Routes are added, set and removed there too.
+* Patches: pick a slot under Play, then Save patch, Load patch or Init patch
+  (replacing a full slot and Init ask for a second click).
 * The EQ curve is the exact response of the three filters; drag its points.
   The reverb shows its pre-delay, first reflections and tail, and what Depth does to it.
 * Knobs: drag up and down (Shift for fine), mouse wheel, arrow keys, Home and
@@ -333,7 +349,12 @@ as a demo on a made-up reel.
 
 ## Beta
 
-Version 0.14.0 brings the basic gestures for playing live: TEMP on Undo,
+Version 0.15.0 follows the first beta of 0.14: the pages grouped by Track
+(Track 1 the genes, Track 2 the reel and setup, Track 3 recording, Track 4
+the effects), two LFOs and the Envelope in place of Wave, Random and Follow,
+patches with Init, Trim Key Noise counted from the release of the key, Delete
+held alone no longer clearing markers, and the editor drawing each LFO as its
+shape. 0.14.0 brought the basic gestures for playing live: TEMP on Undo,
 Delete + knob back to the start value, a polarity for each route, the live
 value on modulated cells and a DJ filter. 0.13.0 cleaned up the noise of the effects: the reverb's modulation
 bends pitch smoothly and never faster than about 1%, the shimmer feeds back
@@ -354,9 +375,12 @@ issue form. [CHANGELOG.md](CHANGELOG.md) lists what changed in each version.
 
 Parameter keys are frozen: none is renamed or removed and no choice loses
 options, so saved sessions keep working
-(`tests/fixtures/params_0.14.0.txt`, checked by the tests). The one exception
-was in 0.8.0, when the six `dly_*` keys of the old delay were retired; in older
-sessions they are simply ignored. A saved state from
+(`tests/fixtures/params_0.15.0.txt`, checked by the tests). The exceptions:
+in 0.8.0 the six `dly_*` keys of the old delay were retired, and in 0.15.0 the
+nine keys of Random, Follow and the Vari-Speed overdub head
+(`tests/fixtures/retired_0.15.0.txt`); in older sessions they are simply
+ignored, and routes from Wave and Envelope carry over to LFO 1 and the
+Envelope. A saved state from
 an older version opens with its own values, and controls it does not know start
 at their default. The saved state carries `"state_format": 1`.
 

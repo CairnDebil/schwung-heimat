@@ -150,11 +150,11 @@ section[aria-labelledby="hRev"] { container-type: inline-size; }
 }
 .revcols .knob, #gEq .knob { width: 72px; }
 .headscols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 0; }
-.modcols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
+.modcols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
 .modcols > div { min-width: 0; padding: 0 14px; border-left: 1px solid var(--hair); }
 .modcols > div:first-child { padding-left: 0; border-left: 0; }
 .modcols h3 { margin: 0 0 6px; font: 700 11px/1 var(--label); letter-spacing: .14em; text-transform: uppercase; color: var(--silk); }
-.modcols canvas { display: block; width: 100%; height: 34px; margin-bottom: 8px; background: var(--window); }
+.modcols canvas { display: block; width: 100%; height: 48px; margin-bottom: 8px; background: var(--window); }
 .routes { margin-top: 16px; display: grid; gap: 6px; }
 .trim { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 8px 16px; align-items: center; margin-top: 8px; }
 .trim .lbl { font: 700 11px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--mag); white-space: nowrap; }
@@ -175,6 +175,9 @@ section[aria-labelledby="hRev"] { container-type: inline-size; }
 .route .x { height: 26px; width: 26px; padding: 0; border: 1.5px solid var(--mag); border-radius: 13px; background: transparent; color: var(--mag); cursor: pointer; font: 700 13px/1 var(--label); }
 .radd { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; font: 600 11px/1 var(--label); letter-spacing: .1em; text-transform: uppercase; color: var(--silk-2); }
 .radd select { height: 30px; background: var(--window); color: var(--silk); border: 1px solid var(--hair); border-radius: 4px; font: 500 13px/1 var(--type); padding: 0 6px; max-width: 100%; }
+.actions.patches { align-items: center; }
+.actions.patches label { display: flex; gap: 8px; align-items: center; font: 600 11px/1 var(--label); letter-spacing: .1em; text-transform: uppercase; color: var(--silk-2); margin-right: 4px; }
+.actions.patches select { height: 30px; background: var(--window); color: var(--silk); border: 1px solid var(--hair); border-radius: 4px; font: 500 13px/1 var(--type); padding: 0 6px; max-width: 100%; }
 .rnone { font: 500 13px/1.4 var(--type); color: var(--silk-3); }
 .headscols > div { min-width: 0; padding: 0 16px; }
 .headscols > div:first-child { padding-left: 0; }
@@ -253,6 +256,7 @@ section[aria-labelledby="hRev"] { container-type: inline-size; }
   .span-4, .span-5 { grid-column: span 6; } .span-7, .span-8 { grid-column: span 12; }
   .modcols { grid-template-columns: repeat(2, 1fr); row-gap: 18px; }
   .modcols > div:nth-child(3) { padding-left: 0; border-left: 0; }
+  .modcols > div:nth-child(3) .row { max-width: 50%; }
 }
 @media (max-width: 760px) {
   .grid { grid-template-columns: minmax(0, 1fr); }
@@ -375,16 +379,15 @@ section[aria-labelledby="hRev"] { container-type: inline-size; }
     </section>
 
     <section class="panel span-12" aria-labelledby="hMods">
-      <h2 id="hMods"><span class="dymo">Modulators</span> <small>four sources; each route adds to a knob, the knob stays where it is</small></h2>
+      <h2 id="hMods"><span class="dymo">Modulators</span> <small>three sources; each route adds to a knob, the knob stays where it is</small></h2>
       <div class="modcols">
-        <div><h3>Wave</h3><canvas id="mod0" aria-label="Wave, live"></canvas><div class="row" id="gMod0"></div></div>
-        <div><h3>Random</h3><canvas id="mod1" aria-label="Random, live"></canvas><div class="row" id="gMod1"></div></div>
-        <div><h3>Follow</h3><canvas id="mod2" aria-label="Follow, live"></canvas><div class="row" id="gMod2"></div></div>
-        <div><h3>Envelope</h3><canvas id="mod3" aria-label="Envelope, live"></canvas><div class="row" id="gMod3"></div></div>
+        <div><h3>LFO 1</h3><canvas id="mod0" aria-label="LFO 1: its shape, and where it is now"></canvas><div class="row" id="gMod0"></div></div>
+        <div><h3>LFO 2</h3><canvas id="mod1" aria-label="LFO 2: its shape, and where it is now"></canvas><div class="row" id="gMod1"></div></div>
+        <div><h3>Envelope</h3><canvas id="mod2" aria-label="Envelope: its shape, and its level now"></canvas><div class="row" id="gMod2"></div></div>
       </div>
       <div class="routes" id="routes" aria-live="polite"></div>
       <div class="radd">
-        <label>Source <select id="rSrc"><option value="0">Wave</option><option value="1">Random</option><option value="2">Follow</option><option value="3">Envelope</option></select></label>
+        <label>Source <select id="rSrc"><option value="0">LFO 1</option><option value="1">LFO 2</option><option value="2">Envelope</option></select></label>
         <label>Control <select id="rTgt"></select></label>
         <button class="abtn" id="rAdd" type="button">Add route</button>
         <button class="abtn warn" id="rClear" type="button">Clear routes</button>
@@ -395,6 +398,12 @@ section[aria-labelledby="hRev"] { container-type: inline-size; }
     <section class="panel span-6" aria-labelledby="hPlay">
       <h2 id="hPlay"><span class="dymo">Play</span></h2>
       <div class="row" id="gPlay"></div>
+      <div class="actions patches">
+        <label>Patch <select id="pSlot" aria-label="Patch slot"></select></label>
+        <button class="abtn" id="pSave" type="button" title="Keep the sound (not the reel, recording or clock settings) in this slot">Save patch</button>
+        <button class="abtn" id="pLoad" type="button" title="Bring back the sound kept in this slot">Load patch</button>
+        <button class="abtn warn" id="pInit" type="button" title="Every control of the sound back to where it starts; the sound before goes to Before Init">Init patch</button>
+      </div>
     </section>
 
     <section class="panel span-6" aria-labelledby="hSplices">
@@ -422,7 +431,7 @@ section[aria-labelledby="hRev"] { container-type: inline-size; }
 <div class="toast" id="toast" role="status"></div>
 
 <script id="heimat-params" type="application/json">
-[{"key":"gene_size","name":"Gene-Size","short":"Gene","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Genes"},{"key":"slide","name":"Slide","short":"Slide","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Genes"},{"key":"morph","name":"Morph","short":"Morph","type":"float","min":0.0,"max":1.0,"default":0.18,"step":0.0025,"group":"Genes"},{"key":"vari_speed","name":"Vari-Speed","short":"Speed","type":"float","min":-1.0,"max":1.0,"default":0.5,"step":0.005,"group":"Genes"},{"key":"organize","name":"Organize","short":"Org","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Genes"},{"key":"volume","name":"Volume","short":"Vol","type":"float","min":0.0,"max":1.0,"default":0.8,"step":0.01,"group":"Play"},{"key":"pad_mode","name":"Pad Mode","short":"Pads","type":"enum","options":["Pitch","Splice","Drone"],"min":0,"max":2,"default":0.0,"step":1,"group":"Play"},{"key":"play_mode","name":"Play Gate","short":"Play","type":"enum","options":["Classic","Momentary","Trigger Loop"],"min":0,"max":2,"default":1.0,"step":1,"group":"Play"},{"key":"release_ms","name":"Release (ms)","short":"Rel","type":"float","min":1.0,"max":2000.0,"default":15.0,"step":1.0,"group":"Play"},{"key":"root_note","name":"Root Note","short":"Root","type":"int","min":0.0,"max":127.0,"default":60.0,"step":1,"group":"Play"},{"key":"octave_transpose","name":"Octave","short":"Oct","type":"int","min":-3.0,"max":3.0,"default":0.0,"step":1,"group":"Play"},{"key":"bend_range","name":"Bend Range","short":"Bend","type":"int","min":0.0,"max":12.0,"default":2.0,"step":1,"group":"Play"},{"key":"splice_base","name":"Splice Pad Base","short":"Base","type":"int","min":0.0,"max":120.0,"default":36.0,"step":1,"group":"Splices and chords"},{"key":"splice_source","name":"Splice Source","short":"SplSrc","type":"enum","options":["Markers","Divide"],"min":0,"max":1,"default":0.0,"step":1,"group":"Splices and chords"},{"key":"divide","name":"Divide Into","short":"Divide","type":"int","min":1.0,"max":32.0,"default":8.0,"step":1,"group":"Splices and chords"},{"key":"organize_mode","name":"Organize Change","short":"OrgMod","type":"enum","options":["End of Gene","Immediate"],"min":0,"max":1,"default":0.0,"step":1,"group":"Genes"},{"key":"gene_window","name":"Gene Envelope","short":"Env","type":"enum","options":["Edge","Tukey","Gauss","Triangle","Expodec","Rexpodec"],"min":0,"max":5,"default":0.0,"step":1,"group":"Micro"},{"key":"mcr1","name":"Morph Chord 2nd","short":"Chrd2","type":"float","min":-16.0,"max":16.0,"default":2.0,"step":0.01,"group":"Splices and chords"},{"key":"mcr2","name":"Morph Chord 3rd","short":"Chrd3","type":"float","min":-16.0,"max":16.0,"default":3.0,"step":0.01,"group":"Splices and chords"},{"key":"mcr3","name":"Morph Chord 4th","short":"Chrd4","type":"float","min":-16.0,"max":16.0,"default":4.0,"step":0.01,"group":"Splices and chords"},{"key":"sos","name":"Sound On Sound","short":"SOS","type":"float","min":0.0,"max":1.0,"default":1.0,"step":0.01,"group":"Recording"},{"key":"in_gain","name":"Input Gain","short":"InGain","type":"enum","options":["-3 dB","0 dB","+6 dB","+12 dB"],"min":0,"max":3,"default":1.0,"step":1,"group":"Recording"},{"key":"rec_source","name":"Record Source","short":"RecSrc","type":"enum","options":["Mix","Input"],"min":0,"max":1,"default":0.0,"step":1,"group":"Recording"},{"key":"rec_sync","name":"Record Sync","short":"RecSyn","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Recording"},{"key":"clock_source","name":"Clock Source","short":"Clock","type":"enum","options":["Off","Internal","Move","MIDI"],"min":0,"max":3,"default":0.0,"step":1,"group":"Clock"},{"key":"clock_div","name":"Clock Division","short":"Div","type":"enum","options":["1/16","1/8","1/4","1/2","1 bar"],"min":0,"max":4,"default":2.0,"step":1,"group":"Clock"},{"key":"bpm","name":"Internal BPM","short":"BPM","type":"int","min":20.0,"max":300.0,"default":120.0,"step":1,"group":"Clock"},{"key":"clock_mode","name":"Clock Action","short":"ClkAct","type":"enum","options":["Auto","Gene Shift","Time Stretch"],"min":0,"max":2,"default":0.0,"step":1,"group":"Clock"},{"key":"mute","name":"Mute","short":"Mute","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Play"},{"key":"save_48k","name":"Save at 48 kHz","short":"Save48","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Recording"},{"key":"scatter","name":"Scatter","short":"Scat","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Micro"},{"key":"spread","name":"Pitch Spread (st)","short":"Sprd","type":"float","min":0.0,"max":12.0,"default":0.0,"step":0.05,"group":"Micro"},{"key":"width","name":"Stereo Width","short":"Width","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.01,"group":"Micro"},{"key":"threshold","name":"Threshold","short":"Thr","type":"float","min":0.0,"max":1.0,"default":0.5,"step":0.0025,"group":"Micro"},{"key":"thr_mode","name":"Selective","short":"Select","type":"enum","options":["Off","Loud","Quiet"],"min":0,"max":2,"default":0.0,"step":1,"group":"Micro"},{"key":"eq_low","name":"EQ Low (dB)","short":"Low","type":"float","min":-15.0,"max":15.0,"default":0.0,"step":0.1,"group":"EQ"},{"key":"eq_mid","name":"EQ Mid (dB)","short":"Mid","type":"float","min":-15.0,"max":15.0,"default":0.0,"step":0.1,"group":"EQ"},{"key":"eq_freq","name":"EQ Mid Freq (Hz)","short":"Freq","type":"float","min":100.0,"max":8000.0,"default":1000.0,"step":10.0,"group":"EQ"},{"key":"eq_high","name":"EQ High (dB)","short":"High","type":"float","min":-15.0,"max":15.0,"default":0.0,"step":0.1,"group":"EQ"},{"key":"rev_size","name":"Reverb Size","short":"Size","type":"float","min":0.0,"max":1.0,"default":0.5,"step":0.0025,"group":"Reverb"},{"key":"rev_predelay","name":"Reverb Pre-Delay (ms)","short":"PreDly","type":"float","min":7.0,"max":500.0,"default":20.0,"step":1.0,"group":"Reverb"},{"key":"rev_reverse","name":"Reverb Reverse","short":"Revrs","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Reverb"},{"key":"rev_decay","name":"Reverb Decay","short":"Decay","type":"float","min":0.0,"max":1.0,"default":0.5,"step":0.0025,"group":"Reverb"},{"key":"rev_damp","name":"Reverb Absorb","short":"Absorb","type":"float","min":0.0,"max":1.0,"default":0.4,"step":0.0025,"group":"Reverb"},{"key":"rev_tilt","name":"Reverb Tilt","short":"Tilt","type":"float","min":-1.0,"max":1.0,"default":0.0,"step":0.005,"group":"Reverb"},{"key":"rev_depth","name":"Reverb Mod Depth","short":"Depth","type":"float","min":-1.0,"max":1.0,"default":0.0,"step":0.005,"group":"Reverb"},{"key":"rev_speed","name":"Reverb Mod Speed","short":"Speed","type":"float","min":0.0,"max":1.0,"default":0.35,"step":0.0025,"group":"Reverb"},{"key":"rev_mix","name":"Reverb Mix","short":"Reverb","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Reverb"},{"key":"fx_rec","name":"Record Through FX","short":"RecFX","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Recording"},{"key":"hd_mix","name":"Heads Mix","short":"Heads","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Heads"},{"key":"hd_time","name":"Heads Time","short":"HTime","type":"enum","options":["2 bars","1 bar","1/2.","1/2","1/4.","1/4","1/8.","1/8","1/8T","1/16","1/16T","1/32","1/64","1/128"],"min":0,"max":13,"default":7.0,"step":1,"group":"Heads"},{"key":"hd_heads","name":"Heads","short":"HCount","type":"int","min":1.0,"max":4.0,"default":2.0,"step":1,"group":"Heads"},{"key":"hd_spacing","name":"Head Spacing","short":"Space","type":"float","min":0.0,"max":1.0,"default":0.3,"step":0.0025,"group":"Heads"},{"key":"hd_fdbk","name":"Heads Feedback","short":"HFdbk","type":"float","min":0.0,"max":1.0,"default":0.45,"step":0.0025,"group":"Heads"},{"key":"hd_reverse","name":"Reverse Heads","short":"Rev","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Heads"},{"key":"hd_wear","name":"Wear","short":"Wear","type":"enum","options":["Dark","Thin","Crush","Warm","Fold","Fuzz"],"min":0,"max":5,"default":0.0,"step":1,"group":"Heads"},{"key":"hd_wear_amt","name":"Wear Amount","short":"WAmt","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Heads"},{"key":"hd_mode","name":"Heads Mode","short":"HMode","type":"enum","options":["Fade","Glide","Rise","Fall"],"min":0,"max":3,"default":0.0,"step":1,"group":"Heads"},{"key":"hd_route","name":"Heads Routing","short":"Route","type":"enum","options":["Own","Cross","Chain","Wander"],"min":0,"max":3,"default":0.0,"step":1,"group":"Heads"},{"key":"hd_freeze","name":"Freeze Heads","short":"Freeze","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Heads"},{"key":"gene_reverse","name":"Gene Reverse","short":"GRev","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Micro"},{"key":"spread_mode","name":"Spread Intervals","short":"Intvl","type":"enum","options":["Free","Semitones","Octaves","Fifths","Major","Minor"],"min":0,"max":5,"default":0.0,"step":1,"group":"Micro"},{"key":"pattern","name":"Pattern","short":"Pattn","type":"enum","options":["Off","2","3","4","5","6","8","12","16","32"],"min":0,"max":9,"default":0.0,"step":1,"group":"Micro"},{"key":"pattern_seed","name":"Pattern Seed","short":"Seed","type":"int","min":1.0,"max":999.0,"default":1.0,"step":1,"group":"Micro"},{"key":"rec_length","name":"Record Length","short":"RecLen","type":"enum","options":["Free","1 bar","2 bars","4 bars","8 bars","16 bars"],"min":0,"max":5,"default":0.0,"step":1,"group":"Recording"},{"key":"rec_after","name":"After Recording","short":"After","type":"enum","options":["Play","Overdub"],"min":0,"max":1,"default":0.0,"step":1,"group":"Recording"},{"key":"rec_head","name":"Overdub Head","short":"RecHd","type":"enum","options":["Steady","Vari-Speed"],"min":0,"max":1,"default":0.0,"step":1,"group":"Recording"},{"key":"mod_wave_shape","name":"Wave Shape","short":"WShape","type":"enum","options":["Sine","Triangle","Ramp Up","Ramp Down","Square"],"min":0,"max":4,"default":0.0,"step":1,"group":"Modulators"},{"key":"mod_wave_rate","name":"Wave Rate","short":"WRate","type":"float","min":0.0,"max":1.0,"default":0.4,"step":0.0025,"group":"Modulators"},{"key":"mod_wave_sync","name":"Wave Sync","short":"WSync","type":"enum","options":["Free","4 bars","2 bars","1 bar","1/2","1/4","1/8","1/16"],"min":0,"max":7,"default":0.0,"step":1,"group":"Modulators"},{"key":"mod_wave_retrig","name":"Wave Restart","short":"WRst","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Modulators"},{"key":"mod_rand_rate","name":"Random Rate","short":"RRate","type":"float","min":0.0,"max":1.0,"default":0.4,"step":0.0025,"group":"Modulators"},{"key":"mod_rand_smooth","name":"Random Smooth","short":"RSmth","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Modulators"},{"key":"mod_rand_sync","name":"Random Sync","short":"RSync","type":"enum","options":["Free","4 bars","2 bars","1 bar","1/2","1/4","1/8","1/16"],"min":0,"max":7,"default":0.0,"step":1,"group":"Modulators"},{"key":"mod_rand_retrig","name":"Random On Pads","short":"RRst","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Modulators"},{"key":"mod_follow_src","name":"Follow Source","short":"FSrc","type":"enum","options":["Input","Output"],"min":0,"max":1,"default":0.0,"step":1,"group":"Modulators"},{"key":"mod_follow_gain","name":"Follow Gain","short":"FGain","type":"float","min":0.0,"max":1.0,"default":0.5,"step":0.0025,"group":"Modulators"},{"key":"mod_follow_attack","name":"Follow Attack","short":"FAtk","type":"float","min":0.0,"max":1.0,"default":0.1,"step":0.0025,"group":"Modulators"},{"key":"mod_follow_release","name":"Follow Release","short":"FRel","type":"float","min":0.0,"max":1.0,"default":0.4,"step":0.0025,"group":"Modulators"},{"key":"mod_env_attack","name":"Envelope Attack","short":"EAtk","type":"float","min":0.0,"max":1.0,"default":0.1,"step":0.0025,"group":"Modulators"},{"key":"mod_env_decay","name":"Envelope Decay","short":"EDcy","type":"float","min":0.0,"max":1.0,"default":0.4,"step":0.0025,"group":"Modulators"},{"key":"mod_env_mode","name":"Envelope Mode","short":"EMode","type":"enum","options":["AD","Hold","Loop"],"min":0,"max":2,"default":0.0,"step":1,"group":"Modulators"},{"key":"mod_env_trigger","name":"Envelope Trigger","short":"ETrig","type":"enum","options":["Pads","Clock","Pads + Clock"],"min":0,"max":2,"default":0.0,"step":1,"group":"Modulators"},{"key":"rec_trim","name":"Trim Key Noise","short":"KeyTrm","type":"enum","options":["Off","50 ms","100 ms","200 ms","300 ms","500 ms"],"min":0,"max":5,"default":0.0,"step":1,"group":"Recording"},{"key":"in_gate","name":"Input Gate","short":"Gate","type":"enum","options":["Off","-70 dB","-60 dB","-50 dB","-40 dB"],"min":0,"max":4,"default":2.0,"step":1,"group":"Recording"},{"key":"filter","name":"Filter","short":"Filt","type":"float","min":-1.0,"max":1.0,"default":0.0,"step":0.005,"group":"Play"},{"key":"mod_restart","name":"Restart Mods On Clock","short":"MRst","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Modulators"}]
+[{"key":"gene_size","name":"Gene-Size","short":"Gene","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Genes"},{"key":"slide","name":"Slide","short":"Slide","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Genes"},{"key":"morph","name":"Morph","short":"Morph","type":"float","min":0.0,"max":1.0,"default":0.18,"step":0.0025,"group":"Genes"},{"key":"vari_speed","name":"Vari-Speed","short":"Speed","type":"float","min":-1.0,"max":1.0,"default":0.5,"step":0.005,"group":"Genes"},{"key":"organize","name":"Organize","short":"Org","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Genes"},{"key":"volume","name":"Volume","short":"Vol","type":"float","min":0.0,"max":1.0,"default":0.8,"step":0.01,"group":"Play"},{"key":"pad_mode","name":"Pad Mode","short":"Pads","type":"enum","options":["Pitch","Splice","Drone"],"min":0,"max":2,"default":0.0,"step":1,"group":"Play"},{"key":"play_mode","name":"Play Gate","short":"Play","type":"enum","options":["Classic","Momentary","Trigger Loop"],"min":0,"max":2,"default":1.0,"step":1,"group":"Play"},{"key":"release_ms","name":"Release (ms)","short":"Rel","type":"float","min":1.0,"max":2000.0,"default":15.0,"step":1.0,"group":"Play"},{"key":"root_note","name":"Root Note","short":"Root","type":"int","min":0.0,"max":127.0,"default":60.0,"step":1,"group":"Play"},{"key":"octave_transpose","name":"Octave","short":"Oct","type":"int","min":-3.0,"max":3.0,"default":0.0,"step":1,"group":"Play"},{"key":"bend_range","name":"Bend Range","short":"Bend","type":"int","min":0.0,"max":12.0,"default":2.0,"step":1,"group":"Play"},{"key":"splice_base","name":"Splice Pad Base","short":"Base","type":"int","min":0.0,"max":120.0,"default":36.0,"step":1,"group":"Splices and chords"},{"key":"splice_source","name":"Splice Source","short":"SplSrc","type":"enum","options":["Markers","Divide"],"min":0,"max":1,"default":0.0,"step":1,"group":"Splices and chords"},{"key":"divide","name":"Divide Into","short":"Divide","type":"int","min":1.0,"max":32.0,"default":8.0,"step":1,"group":"Splices and chords"},{"key":"organize_mode","name":"Organize Change","short":"OrgMod","type":"enum","options":["End of Gene","Immediate"],"min":0,"max":1,"default":0.0,"step":1,"group":"Genes"},{"key":"gene_window","name":"Gene Envelope","short":"Env","type":"enum","options":["Edge","Tukey","Gauss","Triangle","Expodec","Rexpodec"],"min":0,"max":5,"default":0.0,"step":1,"group":"Micro"},{"key":"mcr1","name":"Morph Chord 2nd","short":"Chrd2","type":"float","min":-16.0,"max":16.0,"default":2.0,"step":0.01,"group":"Splices and chords"},{"key":"mcr2","name":"Morph Chord 3rd","short":"Chrd3","type":"float","min":-16.0,"max":16.0,"default":3.0,"step":0.01,"group":"Splices and chords"},{"key":"mcr3","name":"Morph Chord 4th","short":"Chrd4","type":"float","min":-16.0,"max":16.0,"default":4.0,"step":0.01,"group":"Splices and chords"},{"key":"sos","name":"Sound On Sound","short":"SOS","type":"float","min":0.0,"max":1.0,"default":1.0,"step":0.01,"group":"Recording"},{"key":"in_gain","name":"Input Gain","short":"InGain","type":"enum","options":["-3 dB","0 dB","+6 dB","+12 dB"],"min":0,"max":3,"default":1.0,"step":1,"group":"Recording"},{"key":"rec_source","name":"Record Source","short":"RecSrc","type":"enum","options":["Mix","Input"],"min":0,"max":1,"default":0.0,"step":1,"group":"Recording"},{"key":"rec_sync","name":"Record Sync","short":"RecSyn","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Recording"},{"key":"clock_source","name":"Clock Source","short":"Clock","type":"enum","options":["Off","Internal","Move","MIDI"],"min":0,"max":3,"default":0.0,"step":1,"group":"Clock"},{"key":"clock_div","name":"Clock Division","short":"Div","type":"enum","options":["1/16","1/8","1/4","1/2","1 bar"],"min":0,"max":4,"default":2.0,"step":1,"group":"Clock"},{"key":"bpm","name":"Internal BPM","short":"BPM","type":"int","min":20.0,"max":300.0,"default":120.0,"step":1,"group":"Clock"},{"key":"clock_mode","name":"Clock Action","short":"ClkAct","type":"enum","options":["Auto","Gene Shift","Time Stretch"],"min":0,"max":2,"default":0.0,"step":1,"group":"Clock"},{"key":"mute","name":"Mute","short":"Mute","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Play"},{"key":"save_48k","name":"Save at 48 kHz","short":"Save48","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Recording"},{"key":"scatter","name":"Scatter","short":"Scat","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Micro"},{"key":"spread","name":"Pitch Spread (st)","short":"Sprd","type":"float","min":0.0,"max":12.0,"default":0.0,"step":0.05,"group":"Micro"},{"key":"width","name":"Stereo Width","short":"Width","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.01,"group":"Micro"},{"key":"threshold","name":"Threshold","short":"Thr","type":"float","min":0.0,"max":1.0,"default":0.5,"step":0.0025,"group":"Micro"},{"key":"thr_mode","name":"Selective","short":"Select","type":"enum","options":["Off","Loud","Quiet"],"min":0,"max":2,"default":0.0,"step":1,"group":"Micro"},{"key":"eq_low","name":"EQ Low (dB)","short":"Low","type":"float","min":-15.0,"max":15.0,"default":0.0,"step":0.1,"group":"EQ"},{"key":"eq_mid","name":"EQ Mid (dB)","short":"Mid","type":"float","min":-15.0,"max":15.0,"default":0.0,"step":0.1,"group":"EQ"},{"key":"eq_freq","name":"EQ Mid Freq (Hz)","short":"Freq","type":"float","min":100.0,"max":8000.0,"default":1000.0,"step":10.0,"group":"EQ"},{"key":"eq_high","name":"EQ High (dB)","short":"High","type":"float","min":-15.0,"max":15.0,"default":0.0,"step":0.1,"group":"EQ"},{"key":"rev_size","name":"Reverb Size","short":"Size","type":"float","min":0.0,"max":1.0,"default":0.5,"step":0.0025,"group":"Reverb"},{"key":"rev_predelay","name":"Reverb Pre-Delay (ms)","short":"PreDly","type":"float","min":7.0,"max":500.0,"default":20.0,"step":1.0,"group":"Reverb"},{"key":"rev_reverse","name":"Reverb Reverse","short":"Revrs","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Reverb"},{"key":"rev_decay","name":"Reverb Decay","short":"Decay","type":"float","min":0.0,"max":1.0,"default":0.5,"step":0.0025,"group":"Reverb"},{"key":"rev_damp","name":"Reverb Absorb","short":"Absorb","type":"float","min":0.0,"max":1.0,"default":0.4,"step":0.0025,"group":"Reverb"},{"key":"rev_tilt","name":"Reverb Tilt","short":"Tilt","type":"float","min":-1.0,"max":1.0,"default":0.0,"step":0.005,"group":"Reverb"},{"key":"rev_depth","name":"Reverb Mod Depth","short":"Depth","type":"float","min":-1.0,"max":1.0,"default":0.0,"step":0.005,"group":"Reverb"},{"key":"rev_speed","name":"Reverb Mod Speed","short":"Speed","type":"float","min":0.0,"max":1.0,"default":0.35,"step":0.0025,"group":"Reverb"},{"key":"rev_mix","name":"Reverb Mix","short":"Reverb","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Reverb"},{"key":"fx_rec","name":"Record Through FX","short":"RecFX","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Recording"},{"key":"hd_mix","name":"Heads Mix","short":"Heads","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Heads"},{"key":"hd_time","name":"Heads Time","short":"HTime","type":"enum","options":["2 bars","1 bar","1/2.","1/2","1/4.","1/4","1/8.","1/8","1/8T","1/16","1/16T","1/32","1/64","1/128"],"min":0,"max":13,"default":7.0,"step":1,"group":"Heads"},{"key":"hd_heads","name":"Heads","short":"HCount","type":"int","min":1.0,"max":4.0,"default":2.0,"step":1,"group":"Heads"},{"key":"hd_spacing","name":"Head Spacing","short":"Space","type":"float","min":0.0,"max":1.0,"default":0.3,"step":0.0025,"group":"Heads"},{"key":"hd_fdbk","name":"Heads Feedback","short":"HFdbk","type":"float","min":0.0,"max":1.0,"default":0.45,"step":0.0025,"group":"Heads"},{"key":"hd_reverse","name":"Reverse Heads","short":"Rev","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Heads"},{"key":"hd_wear","name":"Wear","short":"Wear","type":"enum","options":["Dark","Thin","Crush","Warm","Fold","Fuzz"],"min":0,"max":5,"default":0.0,"step":1,"group":"Heads"},{"key":"hd_wear_amt","name":"Wear Amount","short":"WAmt","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Heads"},{"key":"hd_mode","name":"Heads Mode","short":"HMode","type":"enum","options":["Fade","Glide","Rise","Fall"],"min":0,"max":3,"default":0.0,"step":1,"group":"Heads"},{"key":"hd_route","name":"Heads Routing","short":"Route","type":"enum","options":["Own","Cross","Chain","Wander"],"min":0,"max":3,"default":0.0,"step":1,"group":"Heads"},{"key":"hd_freeze","name":"Freeze Heads","short":"Freeze","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Heads"},{"key":"gene_reverse","name":"Gene Reverse","short":"GRev","type":"float","min":0.0,"max":1.0,"default":0.0,"step":0.0025,"group":"Micro"},{"key":"spread_mode","name":"Spread Intervals","short":"Intvl","type":"enum","options":["Free","Semitones","Octaves","Fifths","Major","Minor"],"min":0,"max":5,"default":0.0,"step":1,"group":"Micro"},{"key":"pattern","name":"Pattern","short":"Pattn","type":"enum","options":["Off","2","3","4","5","6","8","12","16","32"],"min":0,"max":9,"default":0.0,"step":1,"group":"Micro"},{"key":"pattern_seed","name":"Pattern Seed","short":"Seed","type":"int","min":1.0,"max":999.0,"default":1.0,"step":1,"group":"Micro"},{"key":"rec_length","name":"Record Length","short":"RecLen","type":"enum","options":["Free","1 bar","2 bars","4 bars","8 bars","16 bars"],"min":0,"max":5,"default":0.0,"step":1,"group":"Recording"},{"key":"rec_after","name":"After Recording","short":"After","type":"enum","options":["Play","Overdub"],"min":0,"max":1,"default":0.0,"step":1,"group":"Recording"},{"key":"mod_wave_shape","name":"LFO 1 Shape","short":"L1Shp","type":"enum","options":["Sine","Triangle","Ramp Up","Ramp Down","Square","Random","Smooth Random"],"min":0,"max":6,"default":0.0,"step":1,"group":"Modulators"},{"key":"mod_wave_rate","name":"LFO 1 Rate","short":"L1Rate","type":"float","min":0.0,"max":1.0,"default":0.4,"step":0.0025,"group":"Modulators"},{"key":"mod_wave_sync","name":"LFO 1 Sync","short":"L1Sync","type":"enum","options":["Free","4 bars","2 bars","1 bar","1/2","1/4","1/8","1/16"],"min":0,"max":7,"default":0.0,"step":1,"group":"Modulators"},{"key":"mod_wave_retrig","name":"LFO 1 Restart","short":"L1Rst","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Modulators"},{"key":"mod_lfo2_shape","name":"LFO 2 Shape","short":"L2Shp","type":"enum","options":["Sine","Triangle","Ramp Up","Ramp Down","Square","Random","Smooth Random"],"min":0,"max":6,"default":1.0,"step":1,"group":"Modulators"},{"key":"mod_lfo2_rate","name":"LFO 2 Rate","short":"L2Rate","type":"float","min":0.0,"max":1.0,"default":0.25,"step":0.0025,"group":"Modulators"},{"key":"mod_lfo2_sync","name":"LFO 2 Sync","short":"L2Sync","type":"enum","options":["Free","4 bars","2 bars","1 bar","1/2","1/4","1/8","1/16"],"min":0,"max":7,"default":0.0,"step":1,"group":"Modulators"},{"key":"mod_lfo2_retrig","name":"LFO 2 Restart","short":"L2Rst","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Modulators"},{"key":"mod_env_attack","name":"Envelope Attack","short":"EAtk","type":"float","min":0.0,"max":1.0,"default":0.1,"step":0.0025,"group":"Modulators"},{"key":"mod_env_decay","name":"Envelope Decay","short":"EDcy","type":"float","min":0.0,"max":1.0,"default":0.4,"step":0.0025,"group":"Modulators"},{"key":"mod_env_mode","name":"Envelope Mode","short":"EMode","type":"enum","options":["AD","Hold","Loop"],"min":0,"max":2,"default":0.0,"step":1,"group":"Modulators"},{"key":"mod_env_trigger","name":"Envelope Trigger","short":"ETrig","type":"enum","options":["Pads","Clock","Pads + Clock"],"min":0,"max":2,"default":0.0,"step":1,"group":"Modulators"},{"key":"rec_trim","name":"Trim Key Noise","short":"KeyTrm","type":"enum","options":["Off","50 ms","100 ms","200 ms","300 ms","500 ms"],"min":0,"max":5,"default":0.0,"step":1,"group":"Recording"},{"key":"in_gate","name":"Input Gate","short":"Gate","type":"enum","options":["Off","-70 dB","-60 dB","-50 dB","-40 dB"],"min":0,"max":4,"default":2.0,"step":1,"group":"Recording"},{"key":"filter","name":"Filter","short":"Filt","type":"float","min":-1.0,"max":1.0,"default":0.0,"step":0.005,"group":"Play"},{"key":"mod_restart","name":"Restart Mods On Clock","short":"MRst","type":"enum","options":["Off","On"],"min":0,"max":1,"default":0.0,"step":1,"group":"Modulators"}]
 </script>
 <script src="/static/schwung-remote-api.js"></script>
 <script>
@@ -449,7 +458,7 @@ let gotData = false;
 const L = {
   fr: 0, sr: SR0, ns: 1, sel: 0, run: 0, rec: 0, arm: 0, rpos: 0, spd: 1, inp: 0, out: 0,
   gms: 0, dens: 0, ff: 0, clk: 0, bpm: 120, undo: 0, mk: [], gp: [], pkMax: null, pkMin: null, t: 0,
-  mo: [0, 0, 0, 0], routes: [],
+  mo: [0, 0, 0], mph: [0, 0], mpht: 0, routes: [],
 };
 const editing = {};              /* key -> time of the last local edit */
 const sendAt = {}, sendPending = {};
@@ -492,6 +501,7 @@ function onParams(params) {
       continue;
     }
     if (k === "mod_routes") { setRoutes(v); continue; }
+    if (k === "mod_routes2") continue;                  /* the saved form; mod_routes is the one to read */
     if (k.slice(0, 2) === "v_" || k === "rev") { applyLive(k, v); live = true; }
   }
   if (live) { L.t = nowMs(); gotData = true; }
@@ -510,6 +520,8 @@ function applyLive(k, v) {
     case "v_clk": L.clk = +v; break;        case "v_bpm": L.bpm = +v; break;
     case "v_undo": L.undo = +v; break;
     case "v_mo": L.mo = csv(v); break;
+    case "v_mph": L.mph = csv(v); L.mpht = nowMs(); break;
+    case "v_pat": { const k2 = String(v || ""); if (k2 !== L.patKey) { L.patKey = k2; L.pat = new Set(csv(k2)); patchSlots(); } break; }
     case "v_save": if (+v === 2 && L.save !== 2) toast("Reel saved"); if (+v === 3 && L.save !== 3) toast("Saving failed"); L.save = +v; break;
     case "v_mk": L.mk = csv(v); break;
     case "v_gp": L.gp = csv(v); break;
@@ -589,20 +601,16 @@ function fmt(key) {
     case "rev_decay": { const t = revSec(); return t === Infinity ? "Forever" : (t < 10 ? t.toFixed(1) : Math.round(t)) + " s"; }
     case "rev_size": return revSpace();
     case "rev_predelay": return Math.round(v) + " ms";
-    case "mod_wave_rate": case "mod_rand_rate": {
-      const sy = P[key === "mod_wave_rate" ? "mod_wave_sync" : "mod_rand_sync"] | 0;
+    case "mod_wave_rate": case "mod_lfo2_rate": {
+      const sy = P[key === "mod_wave_rate" ? "mod_wave_sync" : "mod_lfo2_sync"] | 0;
       if (sy) return D.mod_wave_sync.options[sy];
       const hz = 0.02 * Math.pow(1000, v); return (hz < 1 ? hz.toFixed(2) : hz.toFixed(1)) + " Hz";
     }
-    case "mod_rand_smooth": return v < 0.01 ? "Steps" : pct(v);
     case "filter": {
       const ax = Math.abs(v); if (ax < 0.004) return "Open";
       const fc = v < 0 ? 20000 * Math.pow(2, -9 * ax) : 20 * Math.pow(2, 9 * ax);
       return (v < 0 ? "LP " : "HP ") + (fc >= 1000 ? (fc / 1000).toFixed(fc >= 10000 ? 0 : 1) + " kHz" : Math.round(fc) + " Hz");
     }
-    case "mod_follow_gain": { const db = Math.round(v * 36 - 6); return (db > 0 ? "+" : db < 0 ? "−" : "") + Math.abs(db) + " dB"; }
-    case "mod_follow_attack": return fmtMs(Math.pow(1000, v));
-    case "mod_follow_release": return fmtMs(10 * Math.pow(300, v));
     case "mod_env_attack": case "mod_env_decay": return fmtMs(Math.pow(5000, v));
     case "rev_tilt": return Math.abs(v) < 0.01 ? "Flat" : (v < 0 ? "Dark " : "Bright ") + pct(Math.abs(v));
     case "rev_depth": return revDepthName(v);
@@ -860,14 +868,15 @@ rows("gPlay", [[seg("pad_mode"), seg("play_mode")], [knob("filter", "DJ filter",
 rows("gSplices", [[seg("splice_source"), stepper("divide", "Divide into"), stepper("splice_base", "Splice pad base")],
   [knob("mcr1", "Chord 2nd"), knob("mcr2", "Chord 3rd"), knob("mcr3", "Chord 4th")]]);
 rows("gRec", [[knob("sos", "Sound on sound", "SOS"), seg("in_gain"), seg("rec_source")], [seg("rec_sync", "Record sync"), seg("save_48k")],
-  [seg("rec_length", "Record length"), seg("rec_after", "After recording")], [seg("rec_head", "Overdub head")],
+  [seg("rec_length", "Record length"), seg("rec_after", "After recording")],
   [seg("rec_trim", "Trim key noise (start and end of a recording)")], [seg("in_gate", "Input gate: below this the input fades out")]]);
-rows("gMod0", [[seg("mod_wave_shape", "Wave shape", ["Sine", "Tri", "Up", "Down", "Square"])], [knob("mod_wave_rate", "Rate")],
-  [seg("mod_wave_sync", "Wave sync")], [seg("mod_wave_retrig", "Restart on pads")]]);
-rows("gMod1", [[knob("mod_rand_rate", "Steps"), knob("mod_rand_smooth", "Glide")], [seg("mod_rand_sync", "Random sync")], [seg("mod_rand_retrig", "New value on pads")]]);
-rows("gMod2", [[seg("mod_follow_src", "Listen to")], [knob("mod_follow_gain", "Gain"), knob("mod_follow_attack", "Rise"), knob("mod_follow_release", "Fall")]]);
+const LFO_SHAPES = ["Sine", "Tri", "Up", "Down", "Square", "Steps", "Glide"];
+rows("gMod0", [[seg("mod_wave_shape", "LFO 1 shape", LFO_SHAPES)], [knob("mod_wave_rate", "Rate")],
+  [seg("mod_wave_sync", "LFO 1 sync")], [seg("mod_wave_retrig", "Restart on pads")]]);
+rows("gMod1", [[seg("mod_lfo2_shape", "LFO 2 shape", LFO_SHAPES)], [knob("mod_lfo2_rate", "Rate")],
+  [seg("mod_lfo2_sync", "LFO 2 sync")], [seg("mod_lfo2_retrig", "Restart on pads")]]);
 put("gModR", [seg("mod_restart", "Restart when the clock starts")]);
-rows("gMod3", [[knob("mod_env_attack", "Env attack"), knob("mod_env_decay", "Env decay")], [seg("mod_env_mode", "Envelope mode", ["AD", "Hold", "Loop"])], [seg("mod_env_trigger", "Started by")]]);
+rows("gMod2", [[knob("mod_env_attack", "Attack"), knob("mod_env_decay", "Decay")], [seg("mod_env_mode", "Envelope mode", ["AD", "Hold", "Loop"])], [seg("mod_env_trigger", "Started by")]]);
 rows("gClock", [[seg("clock_source"), seg("clock_div")], [seg("clock_mode", "Clock action"), stepper("bpm", "Internal BPM")]]);
 
 /* ============================================================== canvases */
@@ -1345,6 +1354,41 @@ document.getElementById("bRecNew").addEventListener("click", () => act("rec_togg
 document.getElementById("bUndo").addEventListener("click", () => { act("undo", 1); toast("Undo"); });
 document.getElementById("bSave").addEventListener("click", () => { act("save_reel", "auto"); toast("Saving the reel"); });
 document.getElementById("aHdClear").addEventListener("click", () => { act("hd_clear", 1); toast("Heads cleared"); });
+
+/* patches: sixteen slots for the sound, slot 0 keeps what played before Init.
+ * Replacing a full slot and Init ask for a second click. */
+function patchSlots() {
+  const sel = document.getElementById("pSlot"), cur = sel.value || "1";
+  const pat = L.pat || new Set();
+  sel.innerHTML = "";
+  for (let n = 0; n <= 16; n++) {
+    const o = document.createElement("option"); o.value = n;
+    o.textContent = (n ? "Slot " + n : "Before Init") + (pat.has(n) ? "" : " (empty)");
+    sel.appendChild(o);
+  }
+  sel.value = cur;
+}
+(function () {
+  patchSlots();
+  let armed = null, armedAt = 0;
+  const twice = (what) => { const ok = armed === what && nowMs() - armedAt < 3000; armed = ok ? null : what; armedAt = nowMs(); return ok; };
+  const slot = () => +document.getElementById("pSlot").value;
+  document.getElementById("pSave").addEventListener("click", () => {
+    const n = slot();
+    if (!n) { toast("Before Init is kept by Init; pick slot 1-16"); return; }
+    if (L.pat && L.pat.has(n) && !twice("save" + n)) { toast("Slot " + n + " holds a patch: click again to replace it"); return; }
+    act("patch_save", n); toast("Patch saved in slot " + n);
+  });
+  document.getElementById("pLoad").addEventListener("click", () => {
+    const n = slot();
+    if (L.pat && !L.pat.has(n)) { toast((n ? "Slot " + n : "Before Init") + " is empty"); return; }
+    act("patch_load", n); toast(n ? "Patch " + n + " loaded" : "The sound before Init is back");
+  });
+  document.getElementById("pInit").addEventListener("click", () => {
+    if (!twice("init")) { toast("Click Init again: the sound now goes to Before Init"); return; }
+    act("init", 1); toast("Init: every control of the sound back to the start");
+  });
+})();
 document.getElementById("aDetect").addEventListener("click", () => { act("detect_markers", "0.50"); toast("Listening for hits"); });
 document.getElementById("aDivide").addEventListener("click", () => { act("markers_divide", Math.round(P.divide)); toast("Divided into " + Math.round(P.divide)); });
 (function () {
@@ -1407,7 +1451,9 @@ const Demo = (function () {
     L.out = clamp(0.25 + 0.4 * P.volume * Math.min(1, genes.length / 2) + rnd() * 0.08, 0, 1) * (spd === 0 ? 0.1 : 1);
     L.inp = 0.05 + rnd() * 0.05;
     const ts = t / 1000, hz = 0.02 * Math.pow(1000, P.mod_wave_rate);
-    L.mo = [Math.sin(2 * Math.PI * hz * ts), (Math.floor(ts * 0.02 * Math.pow(1000, P.mod_rand_rate)) * 7919 % 200) / 100 - 1, L.out, Math.max(0, 1 - (ts % 2) * 3)];
+    const hz2 = 0.02 * Math.pow(1000, P.mod_lfo2_rate);
+    L.mph = [(hz * ts) % 1, (hz2 * ts) % 1]; L.mpht = t;
+    L.mo = [lfoValue(P.mod_wave_shape | 0, L.mph[0], 0), lfoValue(P.mod_lfo2_shape | 0, L.mph[1], 1), Math.max(0, 1 - (ts % 2) * 3)];
   }
   return {
     build, tick,
@@ -1486,7 +1532,7 @@ function trimReset() {
 })();
 
 /* ========================================================== modulation */
-const MOD_NAMES = ["Wave", "Random", "Follow", "Envelope"];
+const MOD_NAMES = ["LFO 1", "LFO 2", "Envelope"];
 function setRoutes(v) {
   const list = String(v || "").split(",").filter(Boolean).map((r) => { const [k, s, a, b] = r.split(":"); return { k, s: +s, a: +a, b: b === undefined ? (+s < 2 ? 1 : 0) : +b }; })
     .filter((r) => D[r.k] && Number.isFinite(r.s) && Number.isFinite(r.a));
@@ -1508,7 +1554,7 @@ function drawRoutes() {
   const box = document.getElementById("routes");
   box.innerHTML = "";
   if (!L.routes.length) {
-    box.innerHTML = '<div class="rnone">No routes yet. On the Move: hold Track 1-4 (Wave, Random, Follow, Envelope) and turn a knob. Here: pick a source and a control below.</div>';
+    box.innerHTML = '<div class="rnone">No routes yet. On the Move: hold Track 1-3 (LFO 1, LFO 2, Envelope) and turn a knob. Here: pick a source and a control below.</div>';
     return;
   }
   L.routes.forEach((r) => {
@@ -1543,20 +1589,70 @@ function drawRoutes() {
   document.getElementById("rClear").addEventListener("click", () => { routeEditAt = nowMs(); L.routes = []; act("mod_clear", "all"); drawRoutes(); });
   drawRoutes();
 })();
-const modHist = [[], [], [], []];
+/* The modulators are drawn as what they are, not as a trace of polled values:
+ * an LFO as one cycle of its shape with a cursor where it is now (the phase
+ * from the Move, carried forward at its rate between updates), the Envelope
+ * as its attack and decay with a dot at its level. */
+const SYNC_BEATS = [0, 16, 8, 4, 2, 1, 0.5, 0.25];
+function lfoHz(l) {
+  const sy = P[l ? "mod_lfo2_sync" : "mod_wave_sync"] | 0;
+  return sy ? bpmNow() / 60 / SYNC_BEATS[sy] : 0.02 * Math.pow(1000, P[l ? "mod_lfo2_rate" : "mod_wave_rate"]);
+}
+function stepVal(l, n) { let x = ((n + 1) * 2654435761 + l * 40503) >>> 0; x ^= x >>> 15; x = Math.imul(x, 2246822519) >>> 0; x ^= x >>> 13; return (x % 2001) / 1000 - 1; }
+function lfoValue(shape, u, l, cyc = 0) {
+  switch (shape) {
+    case 1: return u < 0.5 ? 4 * u - 1 : 3 - 4 * u;
+    case 2: return 2 * u - 1;
+    case 3: return 1 - 2 * u;
+    case 4: return u < 0.5 ? 1 : -1;
+    case 5: return stepVal(l, cyc);
+    case 6: { const a = stepVal(l, cyc - 1), b = stepVal(l, cyc), sm = u * u * (3 - 2 * u); return a + (b - a) * sm; }
+    default: return Math.sin(2 * Math.PI * u);
+  }
+}
+function lfoPhase(l) {
+  const p = L.mph && Number.isFinite(L.mph[l]) ? L.mph[l] : 0;
+  const dt = L.mpht ? Math.min(1, (nowMs() - L.mpht) / 1000) : 0;   /* carried forward, never more than a second */
+  return ((p + lfoHz(l) * dt) % 1 + 1) % 1;
+}
 function drawMods() {
-  for (let m = 0; m < 4; m++) {
-    const h = modHist[m];
-    h.push(L.mo[m] || 0); if (h.length > 120) h.shift();
+  for (let m = 0; m < 3; m++) {
     const cv = document.getElementById("mod" + m);
     const { g, w, h: hh } = fit(cv);
     g.clearRect(0, 0, w, hh);
-    const bip = m < 2, Y = (v) => bip ? hh / 2 - v * (hh / 2 - 3) : hh - 3 - v * (hh - 6);
+    const bip = m < 2, Y = (v) => bip ? hh / 2 - v * (hh / 2 - 4) : hh - 4 - v * (hh - 8);
     g.strokeStyle = COL.grid; g.lineWidth = 1;
     g.beginPath(); g.moveTo(0, Y(0)); g.lineTo(w, Y(0)); g.stroke();
     g.strokeStyle = COL.grease; g.lineWidth = 1.5; g.beginPath();
-    h.forEach((v, i) => { const x = w - (h.length - 1 - i) * w / 119; if (i) g.lineTo(x, Y(v)); else g.moveTo(x, Y(v)); });
-    g.stroke();
+    let cx, cy;
+    if (m < 2) {
+      const shape = P[m ? "mod_lfo2_shape" : "mod_wave_shape"] | 0, cycles = 2, N = Math.max(2, Math.round(w));
+      for (let i = 0; i <= N; i++) {                       /* two cycles; random shapes get a new value per cycle */
+        const t = i / N * cycles, c = Math.min(cycles - 1, Math.floor(t)), u = t - c;
+        const y = Y(lfoValue(shape, shape === 4 || shape === 5 ? Math.min(u, 0.9999) : u, m, c));
+        if (i) g.lineTo(i / N * w, y); else g.moveTo(0, y);
+      }
+      g.stroke();
+      const ph = lfoPhase(m);
+      cx = ph / cycles * w;
+      cy = shape >= 5 ? Y(L.mo[m] || 0) : Y(lfoValue(shape, ph, m, 0));
+      g.strokeStyle = COL.dim; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(cx, 0); g.lineTo(cx, hh); g.stroke();
+    } else {
+      const ta = 0.001 * Math.pow(5000, P.mod_env_attack), td = 0.001 * Math.pow(5000, P.mod_env_decay);
+      const md = P.mod_env_mode | 0, hold = md === 1 ? 0.25 : 0, tot = ta + td + (ta + td) * hold;
+      const sx = (t) => t / tot * w * 0.96;
+      g.moveTo(0, Y(0));
+      for (let i = 0; i <= 24; i++) { const t = ta * i / 24, e = t / ta; g.lineTo(sx(t), Y(e * e)); }
+      const hx = ta + (ta + td) * hold;
+      g.lineTo(sx(hx), Y(1));
+      for (let i = 1; i <= 32; i++) { const e = 1 - i / 32; g.lineTo(sx(hx + td * i / 32), Y(e * e)); }
+      g.stroke();
+      const lv = Math.max(0, Math.min(1, L.mo[2] || 0));
+      cx = w - 6; cy = Y(lv);
+      g.fillStyle = COL.grid; g.fillRect(w - 9, Y(lv), 6, hh - 4 - Y(lv));
+    }
+    g.fillStyle = COL.silk; g.beginPath(); g.arc(cx, cy, 3, 0, Math.PI * 2); g.fill();
   }
 }
 
@@ -1565,7 +1661,7 @@ function frame(t) {
   if (mode === "demo") Demo.tick(t);
   const all = dirty.has("*");
   if (dirty.size) {
-    for (const k in ctl) if (all || dirty.has(k) || k === "gene_size" || k === "rev_decay" || k === "mod_wave_rate" || k === "mod_rand_rate") ctl[k].update();
+    for (const k in ctl) if (all || dirty.has(k) || k === "gene_size" || k === "rev_decay" || k === "mod_wave_rate" || k === "mod_lfo2_rate") ctl[k].update();
     drawTrain(); drawEq(); drawRev();
     dirty.clear();
   }

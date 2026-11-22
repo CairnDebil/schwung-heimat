@@ -5,6 +5,76 @@ version (1.1, 1.2) adds features without breaking saved sessions or patches,
 and a patch version (1.0.1) only fixes things. Before 1.0 every version is a
 development or beta release.
 
+## [0.15.0] — after the first beta of 0.14
+
+Everything here comes from the beta test of 0.14.0 on Schwung 1.9.4. The
+Scenes planned for this version move to 0.16.
+
+### Changed
+- **Pages by family**: each Track button opens its first page and, pressed
+  again, the next. Track 1 the genes (PLAY, MICRO, MICRO 2), Track 2 the reel
+  and the instrument (REEL, SETUP 1, SETUP 2), Track 3 recording (REC, LOOP),
+  Track 4 only the effects (EQ, HEADS, HEADS 2, REVERB, REVERB 2). Shift +
+  Track 1 / 3 / 4 as before (MOD, HEADS, REVERB). The lit Track button is the
+  one whose family is on screen. From an overlay (Menu, TRIM) a Track button
+  opens its first page.
+- **Modulators: LFO 1, LFO 2, Envelope** (held Track 1, 2, 3). LFO 2 is a
+  second LFO with its own shape, rate, sync and restart (`mod_lfo2_shape`,
+  `mod_lfo2_rate`, `mod_lfo2_sync`, `mod_lfo2_retrig`). Both LFOs gain two
+  shapes: *Random* (a new value each cycle, held) and *Smooth Random* (the
+  same, gliding) — `mod_wave_shape` goes from 5 to 7 options, the old values
+  keep their meaning. Wave is now called LFO 1. MOD 1 holds the two LFOs,
+  MOD 2 the Envelope and *Restart Mods On Clock* (which restarts both LFOs).
+  Track 4 is no longer a modulator, so it opens its page on press.
+- **Trim Key Noise counts from the release of the key**: the beta found
+  100–200 ms not enough, because the loud part is letting go of Record or
+  Sample. Recording started from a key now writes nothing until the key is
+  released (`rec_key_up`), then skips the trim. If the release never comes,
+  recording starts after 1.5 s anyway. Starts from a clock tick, from the
+  editor or from MIDI are not affected. Engine: `rec_toggle`, `rec_toggle_new`
+  and `rec_cur` / `rec_new` accept `key` as the value.
+- SETUP 2, knob 8: Volume again (Restart Mods On Clock moved to MOD 2).
+- LOOP: knob 3 is Trim Key Noise, knob 6 Record Source; the screen shows the
+  key trim instead of the head.
+
+### Added
+- **Patches**: Menu > *Save patch* (16 slots; a full slot asks for a second
+  click), *Load patch*. A patch is the sound: every control and the routes,
+  but not the reel, the recording settings, the clock, Volume, Mute or
+  Freeze. Files in the data folder, `patches/NN.json`. Engine: `patch_save`,
+  `patch_load`, get `patches` (the full slots), `ui_state` carries `pv` and
+  `pbusy`; the editor gets `v_pat`.
+- **Init patch** (Menu, click twice): every control of the sound back to its
+  start value, routes cleared. The sound before goes to slot 0, *Before Init*,
+  at the top of Load patch. Engine: `init`.
+- Editor: a patch row under Play (slot, Save, Load, Init with a second click).
+- MOD 2 has empty cells (knobs 6–8 do nothing there).
+
+### Fixed
+- **Holding Delete cleared all markers**: Delete held alone (1.2 s) cleared
+  the markers, so holding it to reset a knob could wipe them if the knob came
+  late. Delete held alone now clears nothing; a tap still deletes one marker,
+  but only a tap (under 0.6 s). Clear all markers stays in the Menu; Shift +
+  hold Delete is still a new empty reel.
+- **The route percentage was hidden while holding a Track**: touching the
+  knob showed its reading over the message. Now the depth (`LFO1 > GENE
+  +25%`) is what you see while you turn.
+- **Editor: the LFO drew badly**: it was a trace of values polled a few times
+  a second. Each LFO is now drawn as one cycle of its shape (two cycles, with
+  a new value per cycle for the Random shapes) with a cursor at the phase
+  the Move reports (`v_mph`), carried forward at its rate; the Envelope as
+  its attack and decay with its level.
+
+### Removed
+- **Random** and **Follow** modulators, and the **Vari-Speed overdub head**
+  (the beta asked for them to go). Retired keys, ignored in older sessions:
+  `mod_rand_rate`, `mod_rand_smooth`, `mod_rand_sync`, `mod_rand_retrig`,
+  `mod_follow_src`, `mod_follow_gain`, `mod_follow_attack`,
+  `mod_follow_release`, `rec_head` (`tests/fixtures/retired_0.15.0.txt`).
+  Routes are now saved as `mod_routes2`; an older `mod_routes` is read once:
+  Wave routes become LFO 1, Envelope routes stay Envelope, Random and Follow
+  routes are dropped.
+
 ## [0.14.0] — playing safely
 
 The first of the steps planned after studying how a performance sampler
